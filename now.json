@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "public": false,
+  "builds": [
+    {
+      "src": "*.go",
+      "use": "@now/go"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "colorThief.go"
+    }
+  ]
+}
