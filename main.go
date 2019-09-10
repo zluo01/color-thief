@@ -6,6 +6,7 @@ import (
 	"github.com/kataras/iris/cache"
 	"github.com/kataras/iris/middleware/recover"
 	"image"
+	"log"
 	"net/http"
 	"time"
 )
@@ -26,6 +27,7 @@ func main() {
 		}
 		res, err := http.Get(imgUrl)
 		if err != nil {
+			log.Print(err.Error())
 			ctx.StatusCode(iris.StatusInternalServerError)
 			_, _ = ctx.WriteString(err.Error())
 			return
@@ -33,6 +35,7 @@ func main() {
 		defer res.Body.Close()
 		img, _, err := image.Decode(res.Body)
 		if err != nil {
+			log.Print(err.Error())
 			ctx.StatusCode(iris.StatusInternalServerError)
 			_, _ = ctx.WriteString(err.Error())
 			return
@@ -40,6 +43,7 @@ func main() {
 		palette := GetPalette(img, 6)
 		js, err := json.Marshal(palette)
 		if err != nil {
+			log.Print(err.Error())
 			ctx.StatusCode(iris.StatusInternalServerError)
 			_, _ = ctx.WriteString(err.Error())
 			return
