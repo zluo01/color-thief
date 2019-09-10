@@ -207,15 +207,15 @@ func NewMutableColor(hue float64) MutableColor {
 }
 
 func avrg(a, b, k float64) float64 {
-	return a + b - a*k
+	return a + math.Round((b-a)*k)
 }
 
 func (m *MutableColor) setHue(h float64) float64 {
-	m.hue = math.Remainder(h, 360)
-	d := math.Remainder(m.hue, 15)
+	m.hue = math.Mod(h, 360)
+	d := math.Mod(m.hue, 15)
 	k := d / 15
 	d1 := m.hue - d
-	d2 := math.Remainder(d1+15, 360)
+	d2 := math.Mod(d1+15, 360)
 	if d1 == 360 {
 		d1 = 0
 	}
@@ -269,7 +269,7 @@ func (m MutableColor) getHex(webSafe bool, variation int) string {
 }
 
 func (m *MutableColor) rotate(angle float64) {
-	m.setHue(math.Abs(math.Remainder(m.hue+angle, 360)))
+	m.setHue(math.Mod(m.hue+angle, 360))
 }
 
 func (m MutableColor) getSaturation(variation int) float64 {

@@ -11,7 +11,6 @@ const BucketSize = 64
 
 type SortedColor struct {
 	Color string `json:"color"`
-	rgb   ColorWrapper
 	diff  float64
 }
 
@@ -50,25 +49,23 @@ func GetPalette(image image.Image, count int) []SortedColor {
 	}
 	sort.Slice(pq, func(i, j int) bool { return pq[i].priority > pq[j].priority })
 
+	var dominant = pq[0].value.GetAverageColor()
+	var d = SortedColor{Color: dominant.Hex()}
 	if pq.Len() < count {
-		h, _, _ := pq[0].value.Hsv()
-		return generatePalette(h, count)
+		h, _, _ := dominant.Hsv()
+		return append([]SortedColor{d}, generatePalette(h, count)...)
 	}
-	var palette = make([]SortedColor, count)
-	var dominant ColorWrapper
-	for i, b := range pq[:count] {
+	var palette = make([]SortedColor, count-1)
+	for i, b := range pq[1:count] {
 		c := b.value.GetAverageColor()
-		if i == 0 {
-			dominant = c
-		}
-		palette[i] = SortedColor{c.Hex(), c, c.DistanceLab(dominant)}
+		palette[i] = SortedColor{c.Hex(), c.DistanceLab(dominant)}
 	}
-	sort.Slice(palette, func(i, j int) bool { return palette[i].diff < palette[j].diff })
-	return palette
+	sort.Slice(palette, func(i, j int) bool { return palette[i].diff > palette[j].diff })
+	return append([]SortedColor{d}, palette...)
 }
 
 func generatePalette(h float64, count int) []SortedColor {
-	c := NewColorScheme().FromHue(h).SetScheme("analogic").Variation("soft").SetWebSafe(true).Colors()
+	c := NewColorScheme().FromHue(h).SetScheme("analogic").Variation("soft").Colors()
 	var palette = make([]SortedColor, count)
 	for i := 0; i < count; i++ {
 		palette[i] = SortedColor{Color: c[i]}
