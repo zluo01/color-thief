@@ -7,8 +7,7 @@ import (
 	"testing"
 )
 
-func Benchmark(b *testing.B) {
-	//img, _ := LoadImage("example/photo1.jpg")
+func BenchmarkGetPalette(b *testing.B) {
 	res, err := os.Open("example/photo1.jpg")
 	if err != nil {
 		log.Fatalln(err.Error())
