@@ -65,7 +65,7 @@ func GetPalette(image image.Image, count int) []SortedColor {
 }
 
 func generatePalette(h float64, count int) []SortedColor {
-	c := NewColorScheme().FromHue(h).SetScheme("analogic").Variation("soft").Colors()
+	c := NewColorScheme().FromHue(h).SetScheme("analogic").Variation("soft").SetWebSafe(true).Colors()
 	var palette = make([]SortedColor, count)
 	for i := 0; i < count; i++ {
 		palette[i] = SortedColor{Color: c[i]}
