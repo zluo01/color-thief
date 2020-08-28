@@ -1,57 +1,78 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
-	"github.com/kataras/iris"
-	"github.com/kataras/iris/cache"
-	"github.com/kataras/iris/middleware/recover"
+	"github.com/valyala/fasthttp"
 	"image"
 	"log"
-	"net/http"
-	"time"
 )
 
+func getPalette(ctx *fasthttp.RequestCtx) {
+	imgUrl := ctx.QueryArgs().Peek("img")
+	if len(imgUrl) == 0 {
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		_, _ = ctx.WriteString("Not enough params")
+		return
+	}
+
+	req := fasthttp.AcquireRequest()
+	req.SetRequestURIBytes(imgUrl)
+	req.Header.SetMethod(fasthttp.MethodGet)
+
+	resp := fasthttp.AcquireResponse()
+
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	client := &fasthttp.Client{}
+	if err := client.Do(req, resp); err != nil {
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		_, _ = ctx.WriteString(err.Error())
+		return
+	}
+
+	buffer := resp.Body()
+	statusCode := resp.StatusCode()
+
+	if statusCode != fasthttp.StatusOK {
+		ctx.SetStatusCode(statusCode)
+		_, _ = ctx.Write(buffer)
+		return
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(buffer))
+	if err != nil {
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		_, _ = ctx.WriteString(err.Error())
+		return
+	}
+
+	palette := GetPalette(img, 6)
+	js, err := json.Marshal(palette)
+	if err != nil {
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		_, _ = ctx.WriteString(err.Error())
+		return
+	}
+	ctx.Response.Header.Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("Cache-Control", "s-maxage=3600, stale-while-revalidate")
+	_, _ = ctx.Write(js)
+}
+
 func main() {
-	app := iris.Default()
 
-	app.Use(recover.New())
+	requestHandler := func(ctx *fasthttp.RequestCtx) {
+		switch string(ctx.Path()) {
+		case "/":
+			getPalette(ctx)
+		default:
+			ctx.Error("Unsupported path", fasthttp.StatusNotFound)
+		}
+	}
 
-	caching := cache.Handler(1 * time.Hour)
-
-	app.Get("/", caching, func(ctx iris.Context) {
-		imgUrl := ctx.URLParam("img")
-		if imgUrl == "" {
-			ctx.StatusCode(iris.StatusBadRequest)
-			_, _ = ctx.WriteString("Not enough params")
-			return
-		}
-		res, err := http.Get(imgUrl)
-		if err != nil {
-			log.Print(err.Error())
-			ctx.StatusCode(iris.StatusInternalServerError)
-			_, _ = ctx.WriteString(err.Error())
-			return
-		}
-		defer res.Body.Close()
-		img, _, err := image.Decode(res.Body)
-		if err != nil {
-			log.Print(err.Error())
-			ctx.StatusCode(iris.StatusInternalServerError)
-			_, _ = ctx.WriteString(err.Error())
-			return
-		}
-		palette := GetPalette(img, 6)
-		js, err := json.Marshal(palette)
-		if err != nil {
-			log.Print(err.Error())
-			ctx.StatusCode(iris.StatusInternalServerError)
-			_, _ = ctx.WriteString(err.Error())
-			return
-		}
-		ctx.Header("Content-Type", "application/json")
-		ctx.Header("Cache-Control", "s-maxage=3600, stale-while-revalidate")
-		_, _ = ctx.Write(js)
-	})
-
-	_ = app.Run(iris.Addr(":8080"), iris.WithOptimizations)
+	// pass plain function to fasthttp
+	if err := fasthttp.ListenAndServe(":8081", requestHandler); err != nil {
+		log.Fatal(err)
+	}
 }

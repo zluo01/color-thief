@@ -236,8 +236,8 @@ func (m *MutableColor) setHue(h float64) float64 {
 
 func (m MutableColor) getHex(webSafe bool, variation int) string {
 	max := math.Max(m.baseRed, math.Max(m.baseGreen, m.baseBlue))
-	var v = m.baseValue
-	var s = m.baseSaturation
+	v := m.baseValue
+	s := m.baseSaturation
 	var k float64
 	if variation >= 0 {
 		v = m.getValue(variation)

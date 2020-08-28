@@ -49,13 +49,13 @@ func GetPalette(image image.Image, count int) []SortedColor {
 	}
 	sort.Slice(pq, func(i, j int) bool { return pq[i].priority > pq[j].priority })
 
-	var dominant = pq[0].value.GetAverageColor()
-	var d = SortedColor{Color: dominant.Hex()}
+	dominant := pq[0].value.GetAverageColor()
+	d := SortedColor{Color: dominant.Hex()}
 	if pq.Len() < count {
 		h, _, _ := dominant.Hsv()
 		return append([]SortedColor{d}, generatePalette(h, count)...)
 	}
-	var palette = make([]SortedColor, count-1)
+	palette := make([]SortedColor, count-1)
 	for i, b := range pq[1:count] {
 		c := b.value.GetAverageColor()
 		palette[i] = SortedColor{c.Hex(), c.DistanceLab(dominant)}
@@ -66,7 +66,7 @@ func GetPalette(image image.Image, count int) []SortedColor {
 
 func generatePalette(h float64, count int) []SortedColor {
 	c := NewColorScheme().FromHue(h).SetScheme("analogic").Variation("soft").SetWebSafe(true).Colors()
-	var palette = make([]SortedColor, count)
+	palette := make([]SortedColor, count)
 	for i := 0; i < count; i++ {
 		palette[i] = SortedColor{Color: c[i]}
 	}

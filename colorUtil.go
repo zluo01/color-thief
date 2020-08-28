@@ -70,7 +70,7 @@ func (c ColorWrapper) Lab() (l, a, b float64) {
 	z := 0.0193339*ri + 0.1191920*gi + 0.9503041*bi
 
 	// xyz to lab
-	var D65 = [3]float64{0.95047, 1.00000, 1.08883}
+	D65 := [3]float64{0.95047, 1.00000, 1.08883}
 	fy := factorize(y / D65[1])
 	l = 1.16*fy - 0.16
 	a = 5.0 * (factorize(x/D65[0]) - fy)
