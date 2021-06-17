@@ -1,32 +1,18 @@
-package main
+package rgbUtil
 
 import (
 	"fmt"
-	"image/color"
 	"math"
 )
 
-// range [0, 255]
-type ColorWrapper struct {
-	r     uint32
-	g     uint32
-	b     uint32
-	count uint32
+func GetBucket(c []uint8, bucketSize uint32) uint32 {
+	return (downSample(uint32(c[0]), bucketSize)*6+downSample(uint32(c[1]), bucketSize))*6 + downSample(uint32(c[2]), bucketSize)
 }
 
-func NewColor(color color.Color) ColorWrapper {
-	r, g, b, _ := color.RGBA()
-	return ColorWrapper{r >> 8, g >> 8, b >> 8, 1}
-}
-
-func (c ColorWrapper) GetBucket() uint32 {
-	return (downSample(c.r)*6+downSample(c.g))*6 + downSample(c.b)
-}
-
-func (c ColorWrapper) Hsv() (h, s, v float64) {
-	r := float64(c.r) / 255.0
-	g := float64(c.g) / 255.0
-	b := float64(c.b) / 255.0
+func Hsv(c []uint32) (h, s, v float64) {
+	r := float64(c[0]) / 255.0
+	g := float64(c[1]) / 255.0
+	b := float64(c[2]) / 255.0
 	min := math.Min(math.Min(r, g), b)
 	v = math.Max(math.Max(r, g), b)
 	C := v - min
@@ -55,14 +41,14 @@ func (c ColorWrapper) Hsv() (h, s, v float64) {
 	return
 }
 
-func (c ColorWrapper) Hex() string {
-	return fmt.Sprintf("%02x%02x%02x", uint8(c.r), uint8(c.g), uint8(c.b))
+func Hex(c []uint32) string {
+	return fmt.Sprintf("%02x%02x%02x", uint8(c[0]), uint8(c[1]), uint8(c[2]))
 }
 
-func (c ColorWrapper) Lab() (l, a, b float64) {
-	ri := linearized(float64(c.r) / 255.0)
-	gi := linearized(float64(c.g) / 255.0)
-	bi := linearized(float64(c.b) / 255.0)
+func Lab(c []uint32) (l, a, b float64) {
+	ri := linearized(float64(c[0]) / 255.0)
+	gi := linearized(float64(c[1]) / 255.0)
+	bi := linearized(float64(c[2]) / 255.0)
 
 	// rgb to xyz
 	x := 0.4124564*ri + 0.3575761*gi + 0.1804375*bi
@@ -78,22 +64,22 @@ func (c ColorWrapper) Lab() (l, a, b float64) {
 	return
 }
 
-func (c ColorWrapper) GetAverageColor() ColorWrapper {
-	if c.count == 0 {
+func GetAverageColor(c []uint32) []uint32 {
+	if c[3] == 0 {
 		return c
 	}
-	return ColorWrapper{r: c.r / c.count, g: c.g / c.count, b: c.b / c.count}
+	return []uint32{c[0] / c[3], c[1] / c[3], c[2] / c[3]}
 }
 
-func (c ColorWrapper) DistanceLab(color ColorWrapper) float64 {
-	l1, a1, b1 := c.Lab()
-	l2, a2, b2 := color.Lab()
+func DistanceLab(src, dst []uint32) float64 {
+	l1, a1, b1 := Lab(src)
+	l2, a2, b2 := Lab(dst)
 	return math.Sqrt(math.Pow(l1-l2, 2) + math.Pow(a1-a2, 2) + math.Pow(b1-b2, 2))
 }
 
-func downSample(c uint32) uint32 {
-	div := c / BucketSize
-	if c%BucketSize > BucketSize/2 {
+func downSample(c, bucketSize uint32) uint32 {
+	div := c / bucketSize
+	if c%bucketSize > bucketSize/2 {
 		div += 1
 	}
 	return div + 1

@@ -10,14 +10,19 @@ import (
 func BenchmarkGetPalette(b *testing.B) {
 	res, err := os.Open("example/photo1.jpg")
 	if err != nil {
-		log.Fatalln(err.Error())
+		log.Fatal(err)
 	}
-	defer res.Close()
+	defer func(res *os.File) {
+		err := res.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(res)
 	img, _, err := image.Decode(res)
 	if err != nil {
-		log.Fatalln(err.Error())
+		log.Fatal(err)
 	}
 	for n := 0; n < b.N; n++ {
-		GetPalette(img, 6)
+		_ = GetPalette(img, 6)
 	}
 }

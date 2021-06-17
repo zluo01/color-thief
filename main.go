@@ -1,78 +1,35 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"github.com/valyala/fasthttp"
 	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"log"
+	"os"
 )
 
-func getPalette(ctx *fasthttp.RequestCtx) {
-	imgUrl := ctx.QueryArgs().Peek("img")
-	if len(imgUrl) == 0 {
-		ctx.SetStatusCode(fasthttp.StatusBadRequest)
-		_, _ = ctx.WriteString("Not enough params")
-		return
-	}
-
-	req := fasthttp.AcquireRequest()
-	req.SetRequestURIBytes(imgUrl)
-	req.Header.SetMethod(fasthttp.MethodGet)
-
-	resp := fasthttp.AcquireResponse()
-
-	defer fasthttp.ReleaseRequest(req)
-	defer fasthttp.ReleaseResponse(resp)
-
-	client := &fasthttp.Client{}
-	if err := client.Do(req, resp); err != nil {
-		ctx.SetStatusCode(fasthttp.StatusBadRequest)
-		_, _ = ctx.WriteString(err.Error())
-		return
-	}
-
-	buffer := resp.Body()
-	statusCode := resp.StatusCode()
-
-	if statusCode != fasthttp.StatusOK {
-		ctx.SetStatusCode(statusCode)
-		_, _ = ctx.Write(buffer)
-		return
-	}
-
-	img, _, err := image.Decode(bytes.NewReader(buffer))
-	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		_, _ = ctx.WriteString(err.Error())
-		return
-	}
-
-	palette := GetPalette(img, 6)
-	js, err := json.Marshal(palette)
-	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		_, _ = ctx.WriteString(err.Error())
-		return
-	}
-	ctx.Response.Header.Set("Content-Type", "application/json")
-	ctx.Response.Header.Set("Cache-Control", "s-maxage=3600, stale-while-revalidate")
-	_, _ = ctx.Write(js)
-}
-
 func main() {
-
-	requestHandler := func(ctx *fasthttp.RequestCtx) {
-		switch string(ctx.Path()) {
-		case "/":
-			getPalette(ctx)
-		default:
-			ctx.Error("Unsupported path", fasthttp.StatusNotFound)
+	res, err := os.Open("example/photo1.jpg")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(res *os.File) {
+		err := res.Close()
+		if err != nil {
+			log.Fatal(err)
 		}
+	}(res)
+	img, _, err := image.Decode(res)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// pass plain function to fasthttp
-	if err := fasthttp.ListenAndServe(":8081", requestHandler); err != nil {
-		log.Fatal(err)
+	// [{70d8ef 0} {2a1c14 0.8070654904252931} {453a32 0.6789211446939512} {8c8579 0.4494588794287456} {51b5c6 0.12899715626661845} {7ae5f3 0.06724747276084027}]
+	expected := []string{"70d8ef", "2a1c14", "453a32", "8c8579", "51b5c6", "7ae5f3"}
+	p := GetPalette(img, 6)
+	for i, c := range p {
+		if c.Color != expected[i] {
+			log.Fatal("Unequal color found", c.Color, expected[i])
+		}
 	}
 }
