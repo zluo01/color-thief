@@ -1,12 +1,15 @@
-package main
+package wu
 
 import (
 	"color-thief/helper"
 	"color-thief/rgbUtil"
-	"fmt"
-	"log"
-	"time"
 )
+
+/**********************************************************************
+		Go Implementation of Wu's Color Quantizer (v. 2)
+			(see Graphics Gems vol. II, pp. 126-133)
+	Ported and modified from: https://gist.github.com/bert/1192520
+**********************************************************************/
 
 const (
 	MaxColor = 256
@@ -35,8 +38,7 @@ func getColorIndex(r, g, b int) int {
  */
 
 // hist3d  build 3-D color histogram of counts, r/g/b, c^2
-func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) []int {
-	var Qadd []int // quantized pixels
+func hist3d(src [][]int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) {
 	var i int
 	var count int
 	var r, g, b int
@@ -48,7 +50,6 @@ func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float6
 		table[i] = i * i
 	}
 
-	Qadd = make([]int, size)
 	for _, v := range src {
 		r = v[0]
 		g = v[1]
@@ -64,10 +65,8 @@ func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float6
 		vmb[inr][ing][inb] += b
 		m2[inr][ing][inb] += float64(table[r] + table[g] + table[b])
 
-		Qadd[count] = getColorIndex(inr, ing, inb)
 		count++
 	}
-	return Qadd
 }
 
 /*
@@ -87,7 +86,7 @@ func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float6
 // m3d Compute cumulative moments. */
 func m3d(vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) {
 	var i, r, g, b int
-	var line, line_r, line_g, line_b int
+	var line, lineR, lineG, lineB int
 	var line2 float64
 	area := make([]int, 33)
 	areaRed := make([]int, 33)
@@ -101,18 +100,18 @@ func m3d(vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) {
 		}
 
 		for g = 1; g <= 32; g++ {
-			line, line_r, line_g, line_b, line2 = 0, 0, 0, 0, 0
+			line, lineR, lineG, lineB, line2 = 0, 0, 0, 0, 0
 			for b = 1; b <= 32; b++ {
 				line += vwt[r][g][b]
-				line_r += vmr[r][g][b]
-				line_g += vmg[r][g][b]
-				line_b += vmb[r][g][b]
+				lineR += vmr[r][g][b]
+				lineG += vmg[r][g][b]
+				lineB += vmb[r][g][b]
 				line2 += m2[r][g][b]
 
 				area[b] += line
-				areaRed[b] += line_r
-				areaGreen[b] += line_g
-				areaBlue[b] += line_b
+				areaRed[b] += lineR
+				areaGreen[b] += lineG
+				areaBlue[b] += lineB
 				area2[b] += line2
 
 				vwt[r][g][b] = vwt[r-1][g][b] + area[b]
@@ -137,10 +136,8 @@ func vol(cube *box, moment [][][]int) int {
 		moment[cube.r0][cube.g0][cube.b0]
 }
 
-// volumeFloat / <summary>
-/// Computes the volume of the cube in a specific moment. For the floating-point values.
-/// </summary>
-func volumeFloat(cube *box, moment [][][]float64) float64 {
+// volFloat Computes the volume of the cube in a specific moment. For the floating-point values.
+func volFloat(cube *box, moment [][][]float64) float64 {
 	return moment[cube.r1][cube.g1][cube.b1] -
 		moment[cube.r1][cube.g1][cube.b0] -
 		moment[cube.r1][cube.g0][cube.b1] +
@@ -153,8 +150,8 @@ func volumeFloat(cube *box, moment [][][]float64) float64 {
 
 /*
   The next two routines allow a slightly more efficient calculation
-  of Vol() for a proposed subbox of a given box.  The sum of top()
-  and Bottom() is the Vol() of a subbox split in the given direction
+  of Vol() for a proposed sub box of a given box.  The sum of top()
+  and Bottom() is the Vol() of a sub box split in the given direction
   and with the specified new upper bound.
 */
 
@@ -212,7 +209,7 @@ func variance(cube *box, wt, mr, mg, mb [][][]int, m2 [][][]float64) float64 {
 	volumeRed := float64(vol(cube, mr))
 	volumeGreen := float64(vol(cube, mg))
 	volumeBlue := float64(vol(cube, mb))
-	volumeMoment := volumeFloat(cube, m2)
+	volumeMoment := volFloat(cube, m2)
 	volumeWeight := float64(vol(cube, wt))
 
 	distance := volumeRed*volumeRed + volumeGreen*volumeGreen + volumeBlue*volumeBlue
@@ -221,50 +218,50 @@ func variance(cube *box, wt, mr, mg, mb [][][]int, m2 [][][]float64) float64 {
 }
 
 // maximize
-// We want to minimize the sum of the variances of two subboxes.
-// The sum(c^2) terms can be ignored since their sum over both subboxes
+// We want to minimize the sum of the variances of two sub boxes.
+// The sum(c^2) terms can be ignored since their sum over both sub boxes
 // is the same (the sum for the whole box) no matter where we split.
 // The remaining terms have a minus sign in the variance formula,
 // so we drop the minus sign and MAXIMIZE the sum of the two terms.
 func maximize(cube *box, dir, first, last int, cut *int,
-	whole_r, whole_g, whole_b, whole_w int,
+	wholeR, wholeG, wholeB, wholeW int,
 	wt, mr, mg, mb [][][]int) float64 {
 
 	var i int
-	var half_r, half_g, half_b, half_w int
-	var base_r, base_g, base_b, base_w int
+	var halfR, halfG, halfB, halfW int
+	var baseR, baseG, baseB, baseW int
 	var temp, max float64
 
-	base_r = bottom(cube, dir, mr)
-	base_g = bottom(cube, dir, mg)
-	base_b = bottom(cube, dir, mb)
-	base_w = bottom(cube, dir, wt)
+	baseR = bottom(cube, dir, mr)
+	baseG = bottom(cube, dir, mg)
+	baseB = bottom(cube, dir, mb)
+	baseW = bottom(cube, dir, wt)
 
 	max = 0.0
 	*cut = -1
 
 	for i = first; i < last; i++ {
 		// determines the cube cut at a certain position
-		half_r = base_r + top(cube, dir, i, mr)
-		half_g = base_g + top(cube, dir, i, mg)
-		half_b = base_b + top(cube, dir, i, mb)
-		half_w = base_w + top(cube, dir, i, wt)
+		halfR = baseR + top(cube, dir, i, mr)
+		halfG = baseG + top(cube, dir, i, mg)
+		halfB = baseB + top(cube, dir, i, mb)
+		halfW = baseW + top(cube, dir, i, wt)
 
 		/* now half_x is sum over lower half of box, if split at i */
-		if half_w == 0 {
-			continue // subbox could be empty of pixels!, never split into an empty box
+		if halfW == 0 {
+			continue // sub box could be empty of pixels!, never split into an empty box
 		} else {
-			temp = float64(half_r*half_r+half_g*half_g+half_b*half_b) / float64(half_w)
+			temp = float64(halfR*halfR+halfG*halfG+halfB*halfB) / float64(halfW)
 		}
 
-		half_r = whole_r - half_r
-		half_g = whole_g - half_g
-		half_b = whole_b - half_b
-		half_w = whole_w - half_w
-		if half_w == 0 {
-			continue // Subbox could be empty of pixels! Never split into an empty box
+		halfR = wholeR - halfR
+		halfG = wholeG - halfG
+		halfB = wholeB - halfB
+		halfW = wholeW - halfW
+		if halfW == 0 {
+			continue // sub box could be empty of pixels! Never split into an empty box
 		} else {
-			temp += float64(half_r*half_r+half_g*half_g+half_b*half_b) / float64(half_w)
+			temp += float64(halfR*halfR+halfG*halfG+halfB*halfB) / float64(halfW)
 		}
 
 		if temp > max {
@@ -278,25 +275,25 @@ func maximize(cube *box, dir, first, last int, cut *int,
 
 func cut(set1, set2 *box, wt, mr, mg, mb [][][]int) bool {
 	var dir int
-	var cutr, cutg, cutb int
-	var whole_r, whole_g, whole_b, whole_w int
-	var maxr, maxg, maxb float64
+	var cutR, cutG, cutB int
+	var wholeR, wholeG, wholeB, wholeW int
+	var maxR, maxG, maxB float64
 
-	whole_r = vol(set1, mr)
-	whole_g = vol(set1, mg)
-	whole_b = vol(set1, mb)
-	whole_w = vol(set1, wt)
+	wholeR = vol(set1, mr)
+	wholeG = vol(set1, mg)
+	wholeB = vol(set1, mb)
+	wholeW = vol(set1, wt)
 
-	maxr = maximize(set1, RED, set1.r0+1, set1.r1, &cutr, whole_r, whole_g, whole_b, whole_w, wt, mr, mg, mb)
-	maxg = maximize(set1, GREEN, set1.g0+1, set1.g1, &cutg, whole_r, whole_g, whole_b, whole_w, wt, mr, mg, mb)
-	maxb = maximize(set1, BLUE, set1.b0+1, set1.b1, &cutb, whole_r, whole_g, whole_b, whole_w, wt, mr, mg, mb)
+	maxR = maximize(set1, RED, set1.r0+1, set1.r1, &cutR, wholeR, wholeG, wholeB, wholeW, wt, mr, mg, mb)
+	maxG = maximize(set1, GREEN, set1.g0+1, set1.g1, &cutG, wholeR, wholeG, wholeB, wholeW, wt, mr, mg, mb)
+	maxB = maximize(set1, BLUE, set1.b0+1, set1.b1, &cutB, wholeR, wholeG, wholeB, wholeW, wt, mr, mg, mb)
 
-	if (maxr >= maxg) && (maxr >= maxb) {
+	if (maxR >= maxG) && (maxR >= maxB) {
 		dir = RED
-		if cutr < 0 {
+		if cutR < 0 {
 			return false /* can't split the box */
 		}
-	} else if (maxg >= maxr) && (maxg >= maxb) {
+	} else if (maxG >= maxR) && (maxG >= maxB) {
 		dir = GREEN
 	} else {
 		dir = BLUE
@@ -307,15 +304,15 @@ func cut(set1, set2 *box, wt, mr, mg, mb [][][]int) bool {
 	set2.b1 = set1.b1
 
 	if dir == RED {
-		set2.r0, set1.r1 = cutr, cutr
+		set2.r0, set1.r1 = cutR, cutR
 		set2.g0 = set1.g0
 		set2.b0 = set1.b0
 	} else if dir == GREEN {
-		set2.g0, set1.g1 = cutg, cutg
+		set2.g0, set1.g1 = cutG, cutG
 		set2.r0 = set1.r0
 		set2.b0 = set1.b0
 	} else { /* dir == BLUE */
-		set2.b0, set1.b1 = cutb, cutb
+		set2.b0, set1.b1 = cutB, cutB
 		set2.r0 = set1.r0
 		set2.g0 = set1.g0
 	}
@@ -337,22 +334,18 @@ func mark(cube *box, label int, tag []int) {
 }
 
 func QuantWu(pixels [][]int, k int) []string {
-	var lut_rgb [][3]int
-	//var tag []int
-	//var Qadd []int
+	var lutRgb [][3]int
 	var next int
 	var i, j int
-	var size int
 	var weight int
-	var max_colors int
+	var maxColors int
 	var wt, mr, mg, mb [][][]int
 	var m2 [][][]float64
 	var temp float64
 	var vv []float64
 	var cube []box
 
-	max_colors = k
-	size = len(pixels)
+	maxColors = k
 
 	wt = *helper.New3dMatrixInt(33, 33, 33)
 	mr = *helper.New3dMatrixInt(33, 33, 33)
@@ -360,7 +353,7 @@ func QuantWu(pixels [][]int, k int) []string {
 	mb = *helper.New3dMatrixInt(33, 33, 33)
 	m2 = *helper.New3dMatrixFloat(33, 33, 33)
 
-	_ = hist3d(pixels, size, wt, mr, mg, mb, m2)
+	hist3d(pixels, wt, mr, mg, mb, m2)
 
 	m3d(wt, mr, mg, mb, m2)
 
@@ -369,7 +362,7 @@ func QuantWu(pixels [][]int, k int) []string {
 
 	next = 0
 	vv = make([]float64, MaxColor)
-	for i = 1; i < max_colors; i++ {
+	for i = 1; i < maxColors; i++ {
 		if cut(&cube[next], &cube[i], wt, mr, mg, mb) {
 			/* Volume test ensures we won't try to cut one-cell box */
 			if cube[next].vol > 1 {
@@ -398,41 +391,27 @@ func QuantWu(pixels [][]int, k int) []string {
 		}
 
 		if temp <= 0.0 {
-			max_colors = i + 1 /* Only got I + 1 boxes */
+			maxColors = i + 1 /* Only got I + 1 boxes */
 			break
 		}
 	}
 
-	//tag = make([]int, 33*33*33)
-	lut_rgb = make([][3]int, MaxColor)
-
-	palette := make([]string, max_colors)
-	for i = 0; i < max_colors; i++ {
-		//mark(&cube[i], i, tag)
+	lutRgb = make([][3]int, MaxColor)
+	palette := make([]string, maxColors)
+	for i = 0; i < maxColors; i++ {
 		weight = vol(&cube[i], wt)
 
 		if weight > 0 {
-			lut_rgb[i][0] = vol(&cube[i], mr) / weight
-			lut_rgb[i][1] = vol(&cube[i], mg) / weight
-			lut_rgb[i][2] = vol(&cube[i], mb) / weight
+			lutRgb[i][0] = vol(&cube[i], mr) / weight
+			lutRgb[i][1] = vol(&cube[i], mg) / weight
+			lutRgb[i][2] = vol(&cube[i], mb) / weight
 		} else { /* Bogux box */
-			lut_rgb[i][0] = 0
-			lut_rgb[i][1] = 0
-			lut_rgb[i][2] = 0
+			lutRgb[i][0] = 0
+			lutRgb[i][1] = 0
+			lutRgb[i][2] = 0
 		}
-		palette[i] = rgbUtil.Hex(lut_rgb[i])
+		palette[i] = rgbUtil.Hex(lutRgb[i])
 	}
 
 	return palette
-}
-
-func main() {
-	img1, err := rgbUtil.ReadImage("example/photo1.jpg")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	p := helper.SubsamplingPixels(img1)
-	start := time.Now()
-	_ = QuantWu(p, 6)
-	fmt.Println(time.Since(start))
 }
