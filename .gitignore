@@ -92,3 +92,5 @@ fabric.properties
 .idea
 out
 gen
+
+*/node_modules
