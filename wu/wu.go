@@ -2,7 +2,6 @@ package wu
 
 import (
 	"color-thief/helper"
-	"color-thief/rgbUtil"
 )
 
 /**********************************************************************
@@ -12,10 +11,10 @@ import (
 **********************************************************************/
 
 const (
-	MaxColor = 256
-	RED      = 2
-	GREEN    = 1
-	BLUE     = 0
+	maxColor = 256
+	red      = 2
+	green    = 1
+	blue     = 0
 )
 
 type box struct {
@@ -43,9 +42,8 @@ func hist3d(src [][]int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) {
 	var count int
 	var r, g, b int
 	var inr, ing, inb int // index for r,g,b
-	var table []int
+	var table [256]int
 
-	table = make([]int, 256)
 	for i = 0; i < 256; i++ {
 		table[i] = i * i
 	}
@@ -88,11 +86,12 @@ func m3d(vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) {
 	var i, r, g, b int
 	var line, lineR, lineG, lineB int
 	var line2 float64
-	area := make([]int, 33)
-	areaRed := make([]int, 33)
-	areaGreen := make([]int, 33)
-	areaBlue := make([]int, 33)
-	area2 := make([]float64, 33)
+
+	area := [33]int{}
+	areaRed := [33]int{}
+	areaGreen := [33]int{}
+	areaBlue := [33]int{}
+	area2 := [33]float64{}
 
 	for r = 1; r <= 32; r++ {
 		for i = 0; i <= 32; i++ {
@@ -158,17 +157,17 @@ func volFloat(cube *box, moment [][][]float64) float64 {
 // bottom Compute part of Vol(cube, mmt) that doesn't depend on r1, g1, or b1 (depending on dir)
 func bottom(cube *box, direction int, moment [][][]int) int {
 	switch direction {
-	case RED:
+	case red:
 		return -moment[cube.r0][cube.g1][cube.b1] +
 			moment[cube.r0][cube.g1][cube.b0] +
 			moment[cube.r0][cube.g0][cube.b1] -
 			moment[cube.r0][cube.g0][cube.b0]
-	case GREEN:
+	case green:
 		return -moment[cube.r1][cube.g0][cube.b1] +
 			moment[cube.r1][cube.g0][cube.b0] +
 			moment[cube.r0][cube.g0][cube.b1] -
 			moment[cube.r0][cube.g0][cube.b0]
-	case BLUE:
+	case blue:
 		return -moment[cube.r1][cube.g1][cube.b0] +
 			moment[cube.r1][cube.g0][cube.b0] +
 			moment[cube.r0][cube.g1][cube.b0] -
@@ -181,18 +180,18 @@ func bottom(cube *box, direction int, moment [][][]int) int {
 // top Compute remainder of Vol(cube, mmt), substituting pos for r1, g1, or b1 (depending on dir)
 func top(cube *box, direction, position int, moment [][][]int) int {
 	switch direction {
-	case RED:
+	case red:
 		return moment[position][cube.g1][cube.b1] -
 			moment[position][cube.g1][cube.b0] -
 			moment[position][cube.g0][cube.b1] +
 			moment[position][cube.g0][cube.b0]
-	case GREEN:
+	case green:
 		return moment[cube.r1][position][cube.b1] -
 			moment[cube.r1][position][cube.b0] -
 			moment[cube.r0][position][cube.b1] +
 			moment[cube.r0][position][cube.b0]
 
-	case BLUE:
+	case blue:
 		return moment[cube.r1][cube.g1][position] -
 			moment[cube.r1][cube.g0][position] -
 			moment[cube.r0][cube.g1][position] +
@@ -284,30 +283,30 @@ func cut(set1, set2 *box, wt, mr, mg, mb [][][]int) bool {
 	wholeB = vol(set1, mb)
 	wholeW = vol(set1, wt)
 
-	maxR = maximize(set1, RED, set1.r0+1, set1.r1, &cutR, wholeR, wholeG, wholeB, wholeW, wt, mr, mg, mb)
-	maxG = maximize(set1, GREEN, set1.g0+1, set1.g1, &cutG, wholeR, wholeG, wholeB, wholeW, wt, mr, mg, mb)
-	maxB = maximize(set1, BLUE, set1.b0+1, set1.b1, &cutB, wholeR, wholeG, wholeB, wholeW, wt, mr, mg, mb)
+	maxR = maximize(set1, red, set1.r0+1, set1.r1, &cutR, wholeR, wholeG, wholeB, wholeW, wt, mr, mg, mb)
+	maxG = maximize(set1, green, set1.g0+1, set1.g1, &cutG, wholeR, wholeG, wholeB, wholeW, wt, mr, mg, mb)
+	maxB = maximize(set1, blue, set1.b0+1, set1.b1, &cutB, wholeR, wholeG, wholeB, wholeW, wt, mr, mg, mb)
 
 	if (maxR >= maxG) && (maxR >= maxB) {
-		dir = RED
+		dir = red
 		if cutR < 0 {
 			return false /* can't split the box */
 		}
 	} else if (maxG >= maxR) && (maxG >= maxB) {
-		dir = GREEN
+		dir = green
 	} else {
-		dir = BLUE
+		dir = blue
 	}
 
 	set2.r1 = set1.r1
 	set2.g1 = set1.g1
 	set2.b1 = set1.b1
 
-	if dir == RED {
+	if dir == red {
 		set2.r0, set1.r1 = cutR, cutR
 		set2.g0 = set1.g0
 		set2.b0 = set1.b0
-	} else if dir == GREEN {
+	} else if dir == green {
 		set2.g0, set1.g1 = cutG, cutG
 		set2.r0 = set1.r0
 		set2.b0 = set1.b0
@@ -333,8 +332,8 @@ func mark(cube *box, label int, tag []int) {
 	}
 }
 
-func QuantWu(pixels [][]int, k int) []string {
-	var lutRgb [][3]int
+func QuantWu(pixels [][]int, k int) [][3]int {
+	var lutRgb [maxColor][3]int
 	var next int
 	var i, j int
 	var weight int
@@ -342,26 +341,24 @@ func QuantWu(pixels [][]int, k int) []string {
 	var wt, mr, mg, mb [][][]int
 	var m2 [][][]float64
 	var temp float64
-	var vv []float64
-	var cube []box
+	var vv [maxColor]float64
+	var cube [maxColor]box
 
 	maxColors = k
 
-	wt = *helper.New3dMatrixInt(33, 33, 33)
-	mr = *helper.New3dMatrixInt(33, 33, 33)
-	mg = *helper.New3dMatrixInt(33, 33, 33)
-	mb = *helper.New3dMatrixInt(33, 33, 33)
-	m2 = *helper.New3dMatrixFloat(33, 33, 33)
+	wt = helper.New3dMatrixInt(33, 33, 33)
+	mr = helper.New3dMatrixInt(33, 33, 33)
+	mg = helper.New3dMatrixInt(33, 33, 33)
+	mb = helper.New3dMatrixInt(33, 33, 33)
+	m2 = helper.New3dMatrixFloat(33, 33, 33)
 
 	hist3d(pixels, wt, mr, mg, mb, m2)
 
 	m3d(wt, mr, mg, mb, m2)
 
-	cube = make([]box, MaxColor)
 	cube[0] = box{r1: 32, g1: 32, b1: 32}
 
 	next = 0
-	vv = make([]float64, MaxColor)
 	for i = 1; i < maxColors; i++ {
 		if cut(&cube[next], &cube[i], wt, mr, mg, mb) {
 			/* Volume test ensures we won't try to cut one-cell box */
@@ -396,22 +393,15 @@ func QuantWu(pixels [][]int, k int) []string {
 		}
 	}
 
-	lutRgb = make([][3]int, MaxColor)
-	palette := make([]string, maxColors)
 	for i = 0; i < maxColors; i++ {
 		weight = vol(&cube[i], wt)
 
 		if weight > 0 {
-			lutRgb[i][0] = vol(&cube[i], mr) / weight
-			lutRgb[i][1] = vol(&cube[i], mg) / weight
-			lutRgb[i][2] = vol(&cube[i], mb) / weight
+			lutRgb[i][0], lutRgb[i][1], lutRgb[i][2] = vol(&cube[i], mr)/weight, vol(&cube[i], mg)/weight, vol(&cube[i], mb)/weight
 		} else { /* Bogux box */
-			lutRgb[i][0] = 0
-			lutRgb[i][1] = 0
-			lutRgb[i][2] = 0
+			lutRgb[i][0], lutRgb[i][1], lutRgb[i][2] = 0, 0, 0
 		}
-		palette[i] = rgbUtil.Hex(lutRgb[i])
 	}
 
-	return palette
+	return lutRgb[:maxColors]
 }
