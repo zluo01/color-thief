@@ -1,3 +1,3 @@
 module color-thief
 
-go 1.15
+go 1.16

@@ -1,6 +1,7 @@
 package wu
 
 import (
+	"color-thief/argsort"
 	"color-thief/helper"
 )
 
@@ -37,17 +38,19 @@ func getColorIndex(r, g, b int) int {
  */
 
 // hist3d  build 3-D color histogram of counts, r/g/b, c^2
-func hist3d(src [][]int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) {
+func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) []int {
 	var i int
 	var count int
 	var r, g, b int
 	var inr, ing, inb int // index for r,g,b
 	var table [256]int
+	var qadd []int
 
 	for i = 0; i < 256; i++ {
 		table[i] = i * i
 	}
 
+	qadd = make([]int, size)
 	for _, v := range src {
 		r = v[0]
 		g = v[1]
@@ -63,8 +66,10 @@ func hist3d(src [][]int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) {
 		vmb[inr][ing][inb] += b
 		m2[inr][ing][inb] += float64(table[r] + table[g] + table[b])
 
+		qadd[count] = getColorIndex(inr, ing, inb)
 		count++
 	}
+	return qadd
 }
 
 /*
@@ -323,10 +328,11 @@ func cut(set1, set2 *box, wt, mr, mg, mb [][][]int) bool {
 }
 
 func mark(cube *box, label int, tag []int) {
-	for redIndex := cube.r0 + 1; redIndex <= cube.r1; redIndex++ {
-		for greenIndex := cube.g0 + 1; greenIndex <= cube.g1; greenIndex++ {
-			for blueIndex := cube.b0 + 1; blueIndex <= cube.b1; blueIndex++ {
-				tag[(redIndex<<10)+(redIndex<<6)+redIndex+(greenIndex<<5)+greenIndex+blueIndex] = label
+	var r, g, b int
+	for r = cube.r0 + 1; r <= cube.r1; r++ {
+		for g = cube.g0 + 1; g <= cube.g1; g++ {
+			for b = cube.b0 + 1; b <= cube.b1; b++ {
+				tag[getColorIndex(r, g, b)] = label
 			}
 		}
 	}
@@ -334,15 +340,20 @@ func mark(cube *box, label int, tag []int) {
 
 func QuantWu(pixels [][]int, k int) [][3]int {
 	var lutRgb [maxColor][3]int
+	var qadd []int
+	var tag []int
 	var next int
 	var i, j int
 	var weight int
+	var size int
 	var maxColors int
 	var wt, mr, mg, mb [][][]int
 	var m2 [][][]float64
 	var temp float64
 	var vv [maxColor]float64
 	var cube [maxColor]box
+	var count []int
+	var palette [][3]int
 
 	maxColors = k
 
@@ -352,7 +363,8 @@ func QuantWu(pixels [][]int, k int) [][3]int {
 	mb = helper.New3dMatrixInt(33, 33, 33)
 	m2 = helper.New3dMatrixFloat(33, 33, 33)
 
-	hist3d(pixels, wt, mr, mg, mb, m2)
+	size = len(pixels)
+	qadd = hist3d(pixels, size, wt, mr, mg, mb, m2)
 
 	m3d(wt, mr, mg, mb, m2)
 
@@ -393,7 +405,9 @@ func QuantWu(pixels [][]int, k int) [][3]int {
 		}
 	}
 
+	tag = make([]int, 33*33*33)
 	for i = 0; i < maxColors; i++ {
+		mark(&cube[i], i, tag)
 		weight = vol(&cube[i], wt)
 
 		if weight > 0 {
@@ -403,5 +417,15 @@ func QuantWu(pixels [][]int, k int) [][3]int {
 		}
 	}
 
-	return lutRgb[:maxColors]
+	count = make([]int, maxColors)
+	for i = 0; i < size; i++ {
+		count[tag[qadd[i]]]++
+	}
+
+	count = argsort.ArgSortedInt(count)
+	palette = make([][3]int, k)
+	for i = 0; i < maxColors; i++ {
+		palette[i] = lutRgb[count[maxColors-1-i]]
+	}
+	return palette
 }

@@ -4,25 +4,33 @@ import (
 	"color-thief/helper"
 	"color-thief/rgbUtil"
 	"log"
+	"reflect"
 	"testing"
 )
 
 var p [][]int
 
 func init() {
-	img1, err := rgbUtil.ReadImage("../example/photo1.jpg")
+	img, err := rgbUtil.ReadImage("../example/photo1.jpg")
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
-	p = helper.SubsamplingPixels(img1)
+	p = helper.SubsamplingPixels(img)
 }
 
 func TestQuantWu(t *testing.T) {
-	expected := []string{"36241b", "aebc6f", "6ccee1", "6b7063", "cededf", "d67818"}
+	expected := [6][3]int{
+		{108, 206, 225},
+		{54, 36, 27},
+		{174, 188, 111},
+		{107, 112, 99},
+		{206, 222, 223},
+		{214, 120, 24},
+	}
 	palette := QuantWu(p, 6)
 	for i := 0; i < 6; i++ {
-		if palette[i] != expected[i] {
-			t.Errorf("unequaled palette found, expected: %s, got %s", expected[i], palette[i])
+		if !reflect.DeepEqual(palette[i], expected[i]) {
+			t.Errorf("unequaled palette found, expected: %v, got %v", expected[i], palette[i])
 		}
 	}
 }
