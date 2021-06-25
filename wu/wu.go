@@ -338,7 +338,7 @@ func mark(cube *box, label int, tag []int) {
 	}
 }
 
-func QuantWu(pixels [][]int, k int) [][3]int {
+func QuantWu(pixels [][]int, k int) ([][]int, []int) {
 	var lutRgb [maxColor][3]int
 	var qadd []int
 	var tag []int
@@ -353,7 +353,9 @@ func QuantWu(pixels [][]int, k int) [][3]int {
 	var vv [maxColor]float64
 	var cube [maxColor]box
 	var count []int
-	var palette [][3]int
+	var p2c []int
+	var palette [3]int
+	var palettes [][]int
 
 	maxColors = k
 
@@ -417,15 +419,18 @@ func QuantWu(pixels [][]int, k int) [][3]int {
 		}
 	}
 
+	p2c = make([]int, size)
 	count = make([]int, maxColors)
 	for i = 0; i < size; i++ {
-		count[tag[qadd[i]]]++
+		p2c[i] = tag[qadd[i]]
+		count[p2c[i]]++
 	}
 
 	count = argsort.ArgSortedInt(count)
-	palette = make([][3]int, k)
+	palettes = helper.New2dMatrixInt(k, 3)
 	for i = 0; i < maxColors; i++ {
-		palette[i] = lutRgb[count[maxColors-1-i]]
+		palette = lutRgb[count[maxColors-1-i]]
+		palettes[i][0], palettes[i][1], palettes[i][2] = palette[0], palette[1], palette[2]
 	}
-	return palette
+	return palettes, p2c
 }
