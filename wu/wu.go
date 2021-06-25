@@ -38,10 +38,10 @@ func getColorIndex(r, g, b int) int {
  */
 
 // hist3d  build 3-D color histogram of counts, r/g/b, c^2
-func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) []int {
+func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb []int, m2 []float64) []int {
 	var i int
 	var count int
-	var r, g, b int
+	var ind, r, g, b int
 	var inr, ing, inb int // index for r,g,b
 	var table [256]int
 	var qadd []int
@@ -60,13 +60,14 @@ func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float6
 		ing = (g >> 3) + 1
 		inb = (b >> 3) + 1
 
-		vwt[inr][ing][inb]++
-		vmr[inr][ing][inb] += r
-		vmg[inr][ing][inb] += g
-		vmb[inr][ing][inb] += b
-		m2[inr][ing][inb] += float64(table[r] + table[g] + table[b])
+		ind = getColorIndex(inr, ing, inb)
+		vwt[ind]++
+		vmr[ind] += r
+		vmg[ind] += g
+		vmb[ind] += b
+		m2[ind] += float64(table[r] + table[g] + table[b])
 
-		qadd[count] = getColorIndex(inr, ing, inb)
+		qadd[count] = ind
 		count++
 	}
 	return qadd
@@ -87,8 +88,9 @@ func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb [][][]int, m2 [][][]float6
 */
 
 // m3d Compute cumulative moments. */
-func m3d(vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) {
+func m3d(vwt, vmr, vmg, vmb []int, m2 []float64) {
 	var i, r, g, b int
+	var ind1, ind2 int
 	var line, lineR, lineG, lineB int
 	var line2 float64
 
@@ -106,11 +108,12 @@ func m3d(vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) {
 		for g = 1; g <= 32; g++ {
 			line, lineR, lineG, lineB, line2 = 0, 0, 0, 0, 0
 			for b = 1; b <= 32; b++ {
-				line += vwt[r][g][b]
-				lineR += vmr[r][g][b]
-				lineG += vmg[r][g][b]
-				lineB += vmb[r][g][b]
-				line2 += m2[r][g][b]
+				ind1 = getColorIndex(r, g, b)
+				line += vwt[ind1]
+				lineR += vmr[ind1]
+				lineG += vmg[ind1]
+				lineB += vmb[ind1]
+				line2 += m2[ind1]
 
 				area[b] += line
 				areaRed[b] += lineR
@@ -118,38 +121,39 @@ func m3d(vwt, vmr, vmg, vmb [][][]int, m2 [][][]float64) {
 				areaBlue[b] += lineB
 				area2[b] += line2
 
-				vwt[r][g][b] = vwt[r-1][g][b] + area[b]
-				vmr[r][g][b] = vmr[r-1][g][b] + areaRed[b]
-				vmg[r][g][b] = vmg[r-1][g][b] + areaGreen[b]
-				vmb[r][g][b] = vmb[r-1][g][b] + areaBlue[b]
-				m2[r][g][b] = m2[r-1][g][b] + area2[b]
+				ind2 = ind1 - 1089 /* [r-1][g][b] */
+				vwt[ind1] = vwt[ind2] + area[b]
+				vmr[ind1] = vmr[ind2] + areaRed[b]
+				vmg[ind1] = vmg[ind2] + areaGreen[b]
+				vmb[ind1] = vmb[ind2] + areaBlue[b]
+				m2[ind1] = m2[ind2] + area2[b]
 			}
 		}
 	}
 }
 
 // vol Compute sum over a box of any given statistic
-func vol(cube *box, moment [][][]int) int {
-	return moment[cube.r1][cube.g1][cube.b1] -
-		moment[cube.r1][cube.g1][cube.b0] -
-		moment[cube.r1][cube.g0][cube.b1] +
-		moment[cube.r1][cube.g0][cube.b0] -
-		moment[cube.r0][cube.g1][cube.b1] +
-		moment[cube.r0][cube.g1][cube.b0] +
-		moment[cube.r0][cube.g0][cube.b1] -
-		moment[cube.r0][cube.g0][cube.b0]
+func vol(cube *box, moment []int) int {
+	return moment[getColorIndex(cube.r1, cube.g1, cube.b1)] -
+		moment[getColorIndex(cube.r1, cube.g1, cube.b0)] -
+		moment[getColorIndex(cube.r1, cube.g0, cube.b1)] +
+		moment[getColorIndex(cube.r1, cube.g0, cube.b0)] -
+		moment[getColorIndex(cube.r0, cube.g1, cube.b1)] +
+		moment[getColorIndex(cube.r0, cube.g1, cube.b0)] +
+		moment[getColorIndex(cube.r0, cube.g0, cube.b1)] -
+		moment[getColorIndex(cube.r0, cube.g0, cube.b0)]
 }
 
 // volFloat Computes the volume of the cube in a specific moment. For the floating-point values.
-func volFloat(cube *box, moment [][][]float64) float64 {
-	return moment[cube.r1][cube.g1][cube.b1] -
-		moment[cube.r1][cube.g1][cube.b0] -
-		moment[cube.r1][cube.g0][cube.b1] +
-		moment[cube.r1][cube.g0][cube.b0] -
-		moment[cube.r0][cube.g1][cube.b1] +
-		moment[cube.r0][cube.g1][cube.b0] +
-		moment[cube.r0][cube.g0][cube.b1] -
-		moment[cube.r0][cube.g0][cube.b0]
+func volFloat(cube *box, moment []float64) float64 {
+	return moment[getColorIndex(cube.r1, cube.g1, cube.b1)] -
+		moment[getColorIndex(cube.r1, cube.g1, cube.b0)] -
+		moment[getColorIndex(cube.r1, cube.g0, cube.b1)] +
+		moment[getColorIndex(cube.r1, cube.g0, cube.b0)] -
+		moment[getColorIndex(cube.r0, cube.g1, cube.b1)] +
+		moment[getColorIndex(cube.r0, cube.g1, cube.b0)] +
+		moment[getColorIndex(cube.r0, cube.g0, cube.b1)] -
+		moment[getColorIndex(cube.r0, cube.g0, cube.b0)]
 }
 
 /*
@@ -160,47 +164,47 @@ func volFloat(cube *box, moment [][][]float64) float64 {
 */
 
 // bottom Compute part of Vol(cube, mmt) that doesn't depend on r1, g1, or b1 (depending on dir)
-func bottom(cube *box, direction int, moment [][][]int) int {
+func bottom(cube *box, direction int, moment []int) int {
 	switch direction {
 	case red:
-		return -moment[cube.r0][cube.g1][cube.b1] +
-			moment[cube.r0][cube.g1][cube.b0] +
-			moment[cube.r0][cube.g0][cube.b1] -
-			moment[cube.r0][cube.g0][cube.b0]
+		return -moment[getColorIndex(cube.r0, cube.g1, cube.b1)] +
+			moment[getColorIndex(cube.r0, cube.g1, cube.b0)] +
+			moment[getColorIndex(cube.r0, cube.g0, cube.b1)] -
+			moment[getColorIndex(cube.r0, cube.g0, cube.b0)]
 	case green:
-		return -moment[cube.r1][cube.g0][cube.b1] +
-			moment[cube.r1][cube.g0][cube.b0] +
-			moment[cube.r0][cube.g0][cube.b1] -
-			moment[cube.r0][cube.g0][cube.b0]
+		return -moment[getColorIndex(cube.r1, cube.g0, cube.b1)] +
+			moment[getColorIndex(cube.r1, cube.g0, cube.b0)] +
+			moment[getColorIndex(cube.r0, cube.g0, cube.b1)] -
+			moment[getColorIndex(cube.r0, cube.g0, cube.b0)]
 	case blue:
-		return -moment[cube.r1][cube.g1][cube.b0] +
-			moment[cube.r1][cube.g0][cube.b0] +
-			moment[cube.r0][cube.g1][cube.b0] -
-			moment[cube.r0][cube.g0][cube.b0]
+		return -moment[getColorIndex(cube.r1, cube.g1, cube.b0)] +
+			moment[getColorIndex(cube.r1, cube.g0, cube.b0)] +
+			moment[getColorIndex(cube.r0, cube.g1, cube.b0)] -
+			moment[getColorIndex(cube.r0, cube.g0, cube.b0)]
 	default:
 		return 0
 	}
 }
 
 // top Compute remainder of Vol(cube, mmt), substituting pos for r1, g1, or b1 (depending on dir)
-func top(cube *box, direction, position int, moment [][][]int) int {
+func top(cube *box, direction, position int, moment []int) int {
 	switch direction {
 	case red:
-		return moment[position][cube.g1][cube.b1] -
-			moment[position][cube.g1][cube.b0] -
-			moment[position][cube.g0][cube.b1] +
-			moment[position][cube.g0][cube.b0]
+		return moment[getColorIndex(position, cube.g1, cube.b1)] -
+			moment[getColorIndex(position, cube.g1, cube.b0)] -
+			moment[getColorIndex(position, cube.g0, cube.b1)] +
+			moment[getColorIndex(position, cube.g0, cube.b0)]
 	case green:
-		return moment[cube.r1][position][cube.b1] -
-			moment[cube.r1][position][cube.b0] -
-			moment[cube.r0][position][cube.b1] +
-			moment[cube.r0][position][cube.b0]
+		return moment[getColorIndex(cube.r1, position, cube.b1)] -
+			moment[getColorIndex(cube.r1, position, cube.b0)] -
+			moment[getColorIndex(cube.r0, position, cube.b1)] +
+			moment[getColorIndex(cube.r0, position, cube.b0)]
 
 	case blue:
-		return moment[cube.r1][cube.g1][position] -
-			moment[cube.r1][cube.g0][position] -
-			moment[cube.r0][cube.g1][position] +
-			moment[cube.r0][cube.g0][position]
+		return moment[getColorIndex(cube.r1, cube.g1, position)] -
+			moment[getColorIndex(cube.r1, cube.g0, position)] -
+			moment[getColorIndex(cube.r0, cube.g1, position)] +
+			moment[getColorIndex(cube.r0, cube.g0, position)]
 	default:
 		return 0
 	}
@@ -209,7 +213,7 @@ func top(cube *box, direction, position int, moment [][][]int) int {
 // variance
 // Compute the weighted variance of a box
 // NB: as with the raw statistics, this is really the variance * size
-func variance(cube *box, wt, mr, mg, mb [][][]int, m2 [][][]float64) float64 {
+func variance(cube *box, wt, mr, mg, mb []int, m2 []float64) float64 {
 	volumeRed := float64(vol(cube, mr))
 	volumeGreen := float64(vol(cube, mg))
 	volumeBlue := float64(vol(cube, mb))
@@ -229,7 +233,7 @@ func variance(cube *box, wt, mr, mg, mb [][][]int, m2 [][][]float64) float64 {
 // so we drop the minus sign and MAXIMIZE the sum of the two terms.
 func maximize(cube *box, dir, first, last int, cut *int,
 	wholeR, wholeG, wholeB, wholeW int,
-	wt, mr, mg, mb [][][]int) float64 {
+	wt, mr, mg, mb []int) float64 {
 
 	var i int
 	var halfR, halfG, halfB, halfW int
@@ -277,7 +281,7 @@ func maximize(cube *box, dir, first, last int, cut *int,
 	return max
 }
 
-func cut(set1, set2 *box, wt, mr, mg, mb [][][]int) bool {
+func cut(set1, set2 *box, wt, mr, mg, mb []int) bool {
 	var dir int
 	var cutR, cutG, cutB int
 	var wholeR, wholeG, wholeB, wholeW int
@@ -347,8 +351,8 @@ func QuantWu(pixels [][]int, k int) ([][]int, []int) {
 	var weight int
 	var size int
 	var maxColors int
-	var wt, mr, mg, mb [][][]int
-	var m2 [][][]float64
+	var wt, mr, mg, mb []int
+	var m2 []float64
 	var temp float64
 	var vv [maxColor]float64
 	var cube [maxColor]box
@@ -359,11 +363,11 @@ func QuantWu(pixels [][]int, k int) ([][]int, []int) {
 
 	maxColors = k
 
-	wt = helper.New3dMatrixInt(33, 33, 33)
-	mr = helper.New3dMatrixInt(33, 33, 33)
-	mg = helper.New3dMatrixInt(33, 33, 33)
-	mb = helper.New3dMatrixInt(33, 33, 33)
-	m2 = helper.New3dMatrixFloat(33, 33, 33)
+	wt = make([]int, 33*33*33)
+	mr = make([]int, 33*33*33)
+	mg = make([]int, 33*33*33)
+	mb = make([]int, 33*33*33)
+	m2 = make([]float64, 33*33*33)
 
 	size = len(pixels)
 	qadd = hist3d(pixels, size, wt, mr, mg, mb, m2)
