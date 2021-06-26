@@ -2,7 +2,6 @@ package wu
 
 import (
 	"color-thief/argsort"
-	"color-thief/helper"
 )
 
 /**********************************************************************
@@ -38,9 +37,8 @@ func getColorIndex(r, g, b int) int {
  */
 
 // hist3d  build 3-D color histogram of counts, r/g/b, c^2
-func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb []int, m2 []float64) []int {
+func hist3d(src [][3]int, size int, vwt, vmr, vmg, vmb []int, m2 []float64) []int {
 	var i int
-	var count int
 	var ind, r, g, b int
 	var inr, ing, inb int // index for r,g,b
 	var table [256]int
@@ -51,10 +49,10 @@ func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb []int, m2 []float64) []int
 	}
 
 	qadd = make([]int, size)
-	for _, v := range src {
-		r = v[0]
-		g = v[1]
-		b = v[2]
+	for i = 0; i < size; i++ {
+		r = src[i][0]
+		g = src[i][1]
+		b = src[i][2]
 
 		inr = (r >> 3) + 1
 		ing = (g >> 3) + 1
@@ -67,8 +65,7 @@ func hist3d(src [][]int, size int, vwt, vmr, vmg, vmb []int, m2 []float64) []int
 		vmb[ind] += b
 		m2[ind] += float64(table[r] + table[g] + table[b])
 
-		qadd[count] = ind
-		count++
+		qadd[i] = ind
 	}
 	return qadd
 }
@@ -342,7 +339,7 @@ func mark(cube *box, label int, tag []int) {
 	}
 }
 
-func QuantWu(pixels [][]int, k int) ([][]int, []int) {
+func QuantWu(pixels [][3]int, k int) [][3]int {
 	var lutRgb [maxColor][3]int
 	var qadd []int
 	var tag []int
@@ -357,9 +354,7 @@ func QuantWu(pixels [][]int, k int) ([][]int, []int) {
 	var vv [maxColor]float64
 	var cube [maxColor]box
 	var count []int
-	var p2c []int
-	var palette [3]int
-	var palettes [][]int
+	var palettes [][3]int
 
 	maxColors = k
 
@@ -423,18 +418,15 @@ func QuantWu(pixels [][]int, k int) ([][]int, []int) {
 		}
 	}
 
-	p2c = make([]int, size)
 	count = make([]int, maxColors)
 	for i = 0; i < size; i++ {
-		p2c[i] = tag[qadd[i]]
-		count[p2c[i]]++
+		count[tag[qadd[i]]]++
 	}
 
 	count = argsort.ArgSortedInt(count)
-	palettes = helper.New2dMatrixInt(k, 3)
+	palettes = make([][3]int, k)
 	for i = 0; i < maxColors; i++ {
-		palette = lutRgb[count[maxColors-1-i]]
-		palettes[i][0], palettes[i][1], palettes[i][2] = palette[0], palette[1], palette[2]
+		palettes[i] = lutRgb[count[maxColors-1-i]]
 	}
-	return palettes, p2c
+	return palettes
 }

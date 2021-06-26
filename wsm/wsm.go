@@ -1,14 +1,9 @@
-package main
+package wsm
 
 import (
 	"color-thief/argsort"
-	"color-thief/helper"
-	"color-thief/rgbUtil"
 	"color-thief/wu"
-	"fmt"
-	"log"
-	"math/rand"
-	"time"
+	"math"
 )
 
 const (
@@ -17,172 +12,182 @@ const (
 	HistSize = 1 << (3 * HistBits)
 )
 
-func getHistogram(pixels [][]int) ([]float64, [][]float64) {
-	pix := helper.New2dMatrixFloat(HistSize, 3)
-	hist := make([]float64, HistSize)
+func getHistogram(pixels [][3]int) ([HistSize]float64, [HistSize][3]float64) {
+	pix := [HistSize][3]float64{}
+	hist := [HistSize]float64{}
 
-	var index, r, g, b int
-	for _, p := range pixels {
-		r = p[0] >> Shift
-		g = p[1] >> Shift
-		b = p[2] >> Shift
-		index = (r << (2 * HistBits)) + (g << HistBits) + b
-		pix[index] = convertToFloat64(p)
-		hist[index]++
+	var ind, r, g, b, i int
+	var inr, ing, inb int
+	var size float64
+	for i = range pixels {
+		r = pixels[i][0]
+		g = pixels[i][1]
+		b = pixels[i][2]
+
+		inr = r >> Shift
+		ing = g >> Shift
+		inb = b >> Shift
+
+		ind = (inr << (2 * HistBits)) + (ing << HistBits) + inb
+		pix[ind][0], pix[ind][1], pix[ind][2] = float64(r), float64(g), float64(b)
+		hist[ind]++
 	}
+
 	// normalize weight by the number of pixels in the image
-	for i := 0; i < HistSize; i++ {
-		hist[i] /= float64(len(pixels))
+	size = float64(len(pixels))
+	for i = 0; i < HistSize; i++ {
+		hist[i] /= size
 	}
 	return hist, pix
 }
 
-// Todo fix
-func WSM(src [][]int, k int) {
+func WSM(src [][3]int, numColors int) [][3]int {
 	// variables
-	var centroids [][]float64 // centroid list with size of k
-	var groups [][]float64    // use when computing new centroids
-	var clusterSize []float64 // cluster size
-	var d [][]float64         // distance matrix
-	var m [][]int             // distance rank matrix
-	var p2c []int             // pointer to centroid index
-	var p int
-	var dist, minDist, prevDist, wcss float64
-
-	var hist []float64
-	var pixels [][]float64
+	var centroids [][3]float64          // centroid list with size of numColors
+	var d []float64                     // distance matrix
+	var m []int                         // distance rank matrix
+	var hist [HistSize]float64          // image encoded histogram
+	var pixels [HistSize][3]float64     // encoded unique pixels
+	var p2c [HistSize]int               // pointer to centroid index
+	var cR, cG, cB, cW, cSize []float64 // use when computing new centroids
+	var nR, nG, nB float64              // new centroid r,g,b
+	var cPix [3]float64
+	var palette [][3]int
+	var pix [3]int
+	var tempC [3]float64
+	var i, j int
+	var p, t int
+	var dist, minDist, prevDist, loss, tempLoss, size, w float64
 
 	// get histogram
 	hist, pixels = getHistogram(src)
 
-	// select init cluster centers
-	centroids = helper.New2dMatrixFloat(k, 3)
-	for i, v := range wu.QuantWu(src, k) {
-		centroids[i] = convertToFloat64(v)
+	// init cluster centers based on wu color quantization result
+	palette = wu.QuantWu(src, numColors)
+	// cannot produce enough color, create palette using color scheme
+	if len(palette) < numColors {
+		return palette
 	}
 
-	// random assign centroid for each pixels
-	p2c = make([]int, len(hist))
-	for i := range hist {
-		p2c[i] = rand.Intn(k)
+	// init centroids
+	centroids = make([][3]float64, numColors)
+	for i, pix = range palette {
+		centroids[i][0], centroids[i][1], centroids[i][2] = float64(pix[0]), float64(pix[1]), float64(pix[2])
 	}
 
-	// default 100 iterations for k-means
+	// random assign centroids to each pixels
+	for i = 0; i < HistSize; i++ {
+		if hist[i] == 0 {
+			continue
+		}
+		p2c[i] = i % numColors
+	}
+
+	loss = 1e6
+	size = float64(len(src))
+	d = make([]float64, numColors*numColors)
+	m = make([]int, numColors*numColors)
+	cR = make([]float64, numColors)
+	cG = make([]float64, numColors)
+	cB = make([]float64, numColors)
+	cW = make([]float64, numColors)
+	cSize = make([]float64, numColors)
+	// default 100 iterations for numColors-means
 	for iter := 0; iter < 100; iter++ {
 		// compute distance matrix
-		d = helper.New2dMatrixFloat(k, k)
-		for i := 0; i < k; i++ {
-			for j := i + 1; j < k; j++ {
-				dist = distance(centroids[i], centroids[j])
-				d[i][j], d[j][i] = dist, dist
+		for i = 0; i < numColors; i++ {
+			for j = i + 1; j < numColors; j++ {
+				dist = (centroids[i][0]-centroids[j][0])*(centroids[i][0]-centroids[j][0]) +
+					(centroids[i][1]-centroids[j][1])*(centroids[i][1]-centroids[j][1]) +
+					(centroids[i][2]-centroids[j][2])*(centroids[i][2]-centroids[j][2])
+				dist = math.Sqrt(dist)
+				d[i*numColors+j], d[j*numColors+i] = dist, dist
 			}
 		}
 
-		// compute distance rank matrix
-		m = rank(d, k)
+		// Construct a K × K matrix M in which row i is a permutation of 1, 2, . . . , K that
+		// represents the clusters in increasing order of distance of their centers from c_i
+		for i = 0; i < numColors; i++ {
+			copy(m[i*numColors:i*numColors+numColors], argsort.ArgSortedFloat(d[i*numColors:i*numColors+numColors]))
+		}
 
-		for i, w := range hist {
+		for i, w = range hist { // Todo
 			if w == 0 {
 				continue
 			}
 			p = p2c[i]
-			dist = distance(pixels[i], centroids[p])
-			minDist = dist
-			prevDist = dist
-			for j := 1; j < k; j++ {
-				t := m[p][j]
-				if d[p][t] >= 4*prevDist {
-					break
+			cPix = pixels[i]
+			dist = (cPix[0]-centroids[p][0])*(cPix[0]-centroids[p][0]) +
+				(cPix[1]-centroids[p][1])*(cPix[1]-centroids[p][1]) +
+				(cPix[2]-centroids[p][2])*(cPix[2]-centroids[p][2])
+			dist = math.Sqrt(dist)
+			minDist, prevDist = dist, dist
+			for j = 1; j < numColors; j++ {
+				t = m[p*numColors+j]
+				if d[p*numColors+t] >= 4*prevDist {
+					break // There can be no other closer center. Stop checking
 				}
-				dist = distance(pixels[i], centroids[t])
-				if dist < minDist {
+				dist = (cPix[0]-centroids[t][0])*(cPix[0]-centroids[t][0]) +
+					(cPix[1]-centroids[t][1])*(cPix[1]-centroids[t][1]) +
+					(cPix[2]-centroids[t][2])*(cPix[2]-centroids[t][2])
+				dist = math.Sqrt(dist)
+				if dist <= minDist {
 					minDist = dist
 					p2c[i] = t
 				}
 			}
 		}
 
-		groups = helper.New2dMatrixFloat(k, 4)
-		clusterSize = make([]float64, k)
+		// reset matrix
+		for i = 0; i < numColors; i++ {
+			cR[i], cG[i], cB[i], cW[i], cSize[i] = 0, 0, 0, 0, 0
+		}
+
 		// recalculate the cluster centers
-		for i, w := range hist {
+		for i, w = range hist {
 			if w == 0 {
 				continue
 			}
 			p = p2c[i]
-			groups[p][0] += pixels[i][0] * w // r
-			groups[p][1] += pixels[i][1] * w // g
-			groups[p][2] += pixels[i][2] * w // b
-			groups[p][3] += w
-			clusterSize[p]++
+			cR[p] += pixels[i][0] * w // r
+			cG[p] += pixels[i][1] * w // g
+			cB[p] += pixels[i][2] * w // b
+			cW[p] += w
+			cSize[p] += w * size
 		}
 
-		wcss = 0
-		for i, c := range groups {
-			nR := c[0] / c[3]
-			nG := c[1] / c[3]
-			nB := c[2] / c[3]
+		for i = 0; i < numColors; i++ {
+			nR = cR[i] / cW[i]
+			nG = cG[i] / cW[i]
+			nB = cB[i] / cW[i]
 
-			wcss += (centroids[i][0]-nR)*(centroids[i][0]-nR) +
-				(centroids[i][1]-nG)*(centroids[i][1]-nG) +
-				(centroids[i][2]-nB)*(centroids[i][2]-nB)
-			centroids[i] = []float64{nR, nG, nB}
+			centroids[i][0], centroids[i][1], centroids[i][2] = nR, nG, nB
 		}
 
-		fmt.Println(wcss)
-		if wcss < 1e-3 {
-			fmt.Println("iterations:", iter)
+		tempLoss = 0
+		for i, w = range hist {
+			if w == 0 {
+				continue
+			}
+			p = p2c[i]
+			cPix = pixels[i]
+			dist = (cPix[0]-centroids[p][0])*(cPix[0]-centroids[p][0]) +
+				(cPix[1]-centroids[p][1])*(cPix[1]-centroids[p][1]) +
+				(cPix[2]-centroids[p][2])*(cPix[2]-centroids[p][2])
+			dist = math.Sqrt(dist)
+			tempLoss += dist
+		}
+
+		if loss-tempLoss < 1e-3 {
 			break
 		}
+		loss = tempLoss
 	}
-	//
-	//clusterRank := argsort.ArgSortedFloat(clusterSize)
-	//sb := strings.Builder{}
-	//for i := k - 1; i >= 0; i-- {
-	//	c := centroids[clusterRank[i]]
-	//	sb.WriteString(fmt.Sprintf("\"#%02x%02x%02x\"", uint8(c[0]), uint8(c[1]), uint8(c[2])))
-	//	if i > 0 {
-	//		sb.WriteString(",")
-	//	}
-	//}
-	//fmt.Println(sb.String())
-}
 
-// Construct a K × K matrix M in which row i is a permutation of 1, 2, . . . , K that
-// represents the clusters in increasing order of distance of their centers from c_i
-func rank(d [][]float64, k int) [][]int {
-	m := helper.New2dMatrixInt(k, k)
-	for i, v := range d {
-		m[i] = argsort.ArgSortedFloat(v)
+	clusterRank := argsort.ArgSortedFloat(cSize)
+	for i = 0; i < numColors; i++ {
+		tempC = centroids[clusterRank[numColors-1-i]]
+		palette[i][0], palette[i][1], palette[i][2] = int(tempC[0]), int(tempC[1]), int(tempC[2])
 	}
-	return m
-}
-
-func distance(c1, c2 []float64) float64 {
-	sum := 0.0
-	for i := range c1 {
-		sum += (c1[i] - c2[i]) * (c1[i] - c2[i])
-	}
-	return sum
-}
-
-func convertToFloat64(p []int) []float64 {
-	c := make([]float64, 3)
-	for i, v := range p {
-		c[i] = float64(v)
-	}
-	return c
-}
-
-func main() {
-	img1, err := rgbUtil.ReadImage("example/photo1.jpg")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	start := time.Now()
-	p := helper.SubsamplingPixels(img1)
-	fmt.Println(time.Since(start))
-	start = time.Now()
-	WSM(p, 6)
-	fmt.Println(time.Since(start))
+	return palette
 }
