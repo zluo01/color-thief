@@ -1,13 +1,38 @@
 package helper
 
 import (
+	"fmt"
 	"image"
 	"image/draw"
+	_ "image/jpeg"
+	_ "image/png"
+	"os"
 )
 
 // SubsamplingPixels 2.2.1 Implement 2:1 subsampling in the horizontal and vertical directions, so that only
 // 1/4-th of the input image pixels are taken into account
-func SubsamplingPixels(src image.Image) [][3]int {
+func SubsamplingPixels(src []int, width, height int) [][3]int {
+	var offset, y, x, idx int
+	var samplingSize int
+	var pixels [][3]int
+
+	samplingSize = (width/2 + width%2) * (height/2 + height%2)
+	pixels = make([][3]int, samplingSize)
+
+	idx = 0
+	for y = 0; y < height; y += 2 {
+		for x = 0; x < width; x += 2 {
+			offset = (y*width + x) * 4
+			pixels[idx][0], pixels[idx][1], pixels[idx][2] = src[offset], src[offset+1], src[offset+2]
+			idx++
+		}
+	}
+	return pixels
+}
+
+// SubsamplingPixelsFromImage 2.2.1 Implement 2:1 subsampling in the horizontal and vertical directions, so that only
+// 1/4-th of the input image pixels are taken into account
+func SubsamplingPixelsFromImage(src image.Image) [][3]int {
 	var offset, y, x, idx int
 	var samplingSize int
 	var pixels [][3]int
@@ -29,4 +54,25 @@ func SubsamplingPixels(src image.Image) [][3]int {
 		}
 	}
 	return pixels
+}
+
+func Hex(c [3]int) string {
+	return fmt.Sprintf("#%02x%02x%02x", uint8(c[0]), uint8(c[1]), uint8(c[2]))
+}
+
+func ReadImage(uri string) (image.Image, error) {
+	res, err := os.Open(uri)
+	if err != nil {
+		return nil, err
+	}
+
+	img, _, err := image.Decode(res)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = res.Close(); err != nil {
+		return nil, err
+	}
+	return img, nil
 }

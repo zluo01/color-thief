@@ -2,7 +2,6 @@ package wu
 
 import (
 	"color-thief/helper"
-	"color-thief/rgbUtil"
 	"log"
 	"reflect"
 	"testing"
@@ -11,11 +10,11 @@ import (
 var p [][3]int
 
 func init() {
-	img, err := rgbUtil.ReadImage("../example/photo1.jpg")
+	img, err := helper.ReadImage("../example/photo1.jpg")
 	if err != nil {
 		log.Fatal(err)
 	}
-	p = helper.SubsamplingPixels(img)
+	p = helper.SubsamplingPixelsFromImage(img)
 }
 
 func TestQuantWu(t *testing.T) {
@@ -27,7 +26,10 @@ func TestQuantWu(t *testing.T) {
 		{206, 222, 223},
 		{214, 120, 24},
 	}
-	palette := QuantWu(p, 6)
+	palette, err := QuantWu(p, 6)
+	if err != nil {
+		t.Error(err)
+	}
 	for i := 0; i < 6; i++ {
 		if !reflect.DeepEqual(palette[i], expected[i]) {
 			t.Errorf("unequaled palette found, expected: %v, got %v", expected[i], palette[i])
@@ -37,6 +39,6 @@ func TestQuantWu(t *testing.T) {
 
 func BenchmarkQuantWu(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_ = QuantWu(p, 6)
+		_, _ = QuantWu(p, 6)
 	}
 }

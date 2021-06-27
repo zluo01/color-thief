@@ -13,12 +13,13 @@ const (
 )
 
 func getHistogram(pixels [][3]int) ([HistSize]float64, [HistSize][3]float64) {
-	pix := [HistSize][3]float64{}
-	hist := [HistSize]float64{}
-
 	var ind, r, g, b, i int
 	var inr, ing, inb int
 	var size float64
+
+	pix := [HistSize][3]float64{}
+	hist := [HistSize]float64{}
+
 	for i = range pixels {
 		r = pixels[i][0]
 		g = pixels[i][1]
@@ -41,9 +42,9 @@ func getHistogram(pixels [][3]int) ([HistSize]float64, [HistSize][3]float64) {
 	return hist, pix
 }
 
-func WSM(src [][3]int, numColors int) [][3]int {
+func WSM(src [][3]int, k int) ([][3]int, error) {
 	// variables
-	var centroids [][3]float64          // centroid list with size of numColors
+	var centroids [][3]float64          // centroid list with size of k
 	var d []float64                     // distance matrix
 	var m []int                         // distance rank matrix
 	var hist [HistSize]float64          // image encoded histogram
@@ -51,26 +52,31 @@ func WSM(src [][3]int, numColors int) [][3]int {
 	var p2c [HistSize]int               // pointer to centroid index
 	var cR, cG, cB, cW, cSize []float64 // use when computing new centroids
 	var nR, nG, nB float64              // new centroid r,g,b
-	var cPix [3]float64
-	var palette [][3]int
-	var pix [3]int
-	var tempC [3]float64
-	var i, j int
+	var palette [][3]int                // palette container
+	var cPix [3]float64                 // pixel with float
+	var pix [3]int                      // pixel with int
+	var dist, minDist, prevDist float64
+	var loss, tempLoss float64
+	var size, w float64
+	var iter, i, j int
 	var p, t int
-	var dist, minDist, prevDist, loss, tempLoss, size, w float64
+	var err error
 
 	// get histogram
 	hist, pixels = getHistogram(src)
 
 	// init cluster centers based on wu color quantization result
-	palette = wu.QuantWu(src, numColors)
+	palette, err = wu.QuantWu(src, k)
+	if err != nil {
+		return nil, err
+	}
 	// cannot produce enough color, create palette using color scheme
-	if len(palette) < numColors {
-		return palette
+	if len(palette) < k {
+		return palette, nil
 	}
 
 	// init centroids
-	centroids = make([][3]float64, numColors)
+	centroids = make([][3]float64, k)
 	for i, pix = range palette {
 		centroids[i][0], centroids[i][1], centroids[i][2] = float64(pix[0]), float64(pix[1]), float64(pix[2])
 	}
@@ -80,38 +86,42 @@ func WSM(src [][3]int, numColors int) [][3]int {
 		if hist[i] == 0 {
 			continue
 		}
-		p2c[i] = i % numColors
+		p2c[i] = i % k
 	}
 
 	loss = 1e6
 	size = float64(len(src))
-	d = make([]float64, numColors*numColors)
-	m = make([]int, numColors*numColors)
-	cR = make([]float64, numColors)
-	cG = make([]float64, numColors)
-	cB = make([]float64, numColors)
-	cW = make([]float64, numColors)
-	cSize = make([]float64, numColors)
-	// default 100 iterations for numColors-means
-	for iter := 0; iter < 100; iter++ {
+	d = make([]float64, k*k)
+	m = make([]int, k*k)
+	cR = make([]float64, k)
+	cG = make([]float64, k)
+	cB = make([]float64, k)
+	cW = make([]float64, k)
+	cSize = make([]float64, k)
+	// default 100 iterations for k-means
+	for iter = 0; iter < 100; iter++ {
 		// compute distance matrix
-		for i = 0; i < numColors; i++ {
-			for j = i + 1; j < numColors; j++ {
+		for i = 0; i < k; i++ {
+			for j = i + 1; j < k; j++ {
 				dist = (centroids[i][0]-centroids[j][0])*(centroids[i][0]-centroids[j][0]) +
 					(centroids[i][1]-centroids[j][1])*(centroids[i][1]-centroids[j][1]) +
 					(centroids[i][2]-centroids[j][2])*(centroids[i][2]-centroids[j][2])
 				dist = math.Sqrt(dist)
-				d[i*numColors+j], d[j*numColors+i] = dist, dist
+				d[i*k+j], d[j*k+i] = dist, dist
 			}
 		}
 
 		// Construct a K × K matrix M in which row i is a permutation of 1, 2, . . . , K that
 		// represents the clusters in increasing order of distance of their centers from c_i
-		for i = 0; i < numColors; i++ {
-			copy(m[i*numColors:i*numColors+numColors], argsort.ArgSortedFloat(d[i*numColors:i*numColors+numColors]))
+		for i = 0; i < k; i++ {
+			r, err := argsort.ArgSortedFloat(d[i*k : i*k+k])
+			if err != nil {
+				return nil, err
+			}
+			copy(m[i*k:i*k+k], r)
 		}
 
-		for i, w = range hist { // Todo
+		for i, w = range hist {
 			if w == 0 {
 				continue
 			}
@@ -122,9 +132,9 @@ func WSM(src [][3]int, numColors int) [][3]int {
 				(cPix[2]-centroids[p][2])*(cPix[2]-centroids[p][2])
 			dist = math.Sqrt(dist)
 			minDist, prevDist = dist, dist
-			for j = 1; j < numColors; j++ {
-				t = m[p*numColors+j]
-				if d[p*numColors+t] >= 4*prevDist {
+			for j = 1; j < k; j++ {
+				t = m[p*k+j]
+				if d[p*k+t] >= 4*prevDist {
 					break // There can be no other closer center. Stop checking
 				}
 				dist = (cPix[0]-centroids[t][0])*(cPix[0]-centroids[t][0]) +
@@ -139,7 +149,7 @@ func WSM(src [][3]int, numColors int) [][3]int {
 		}
 
 		// reset matrix
-		for i = 0; i < numColors; i++ {
+		for i = 0; i < k; i++ {
 			cR[i], cG[i], cB[i], cW[i], cSize[i] = 0, 0, 0, 0, 0
 		}
 
@@ -156,7 +166,7 @@ func WSM(src [][3]int, numColors int) [][3]int {
 			cSize[p] += w * size
 		}
 
-		for i = 0; i < numColors; i++ {
+		for i = 0; i < k; i++ {
 			nR = cR[i] / cW[i]
 			nG = cG[i] / cW[i]
 			nB = cB[i] / cW[i]
@@ -184,10 +194,13 @@ func WSM(src [][3]int, numColors int) [][3]int {
 		loss = tempLoss
 	}
 
-	clusterRank := argsort.ArgSortedFloat(cSize)
-	for i = 0; i < numColors; i++ {
-		tempC = centroids[clusterRank[numColors-1-i]]
-		palette[i][0], palette[i][1], palette[i][2] = int(tempC[0]), int(tempC[1]), int(tempC[2])
+	clusterRank, err := argsort.ArgSortedFloat(cSize)
+	if err != nil {
+		return nil, err
 	}
-	return palette
+	for i = 0; i < k; i++ {
+		cPix = centroids[clusterRank[k-1-i]]
+		palette[i][0], palette[i][1], palette[i][2] = int(cPix[0]), int(cPix[1]), int(cPix[2])
+	}
+	return palette, nil
 }

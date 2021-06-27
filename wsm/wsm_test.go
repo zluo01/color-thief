@@ -2,7 +2,6 @@ package wsm
 
 import (
 	"color-thief/helper"
-	"color-thief/rgbUtil"
 	"log"
 	"reflect"
 	"testing"
@@ -14,11 +13,11 @@ var (
 
 func init() {
 	var err error
-	img1, err := rgbUtil.ReadImage("../example/photo1.jpg")
+	img1, err := helper.ReadImage("../example/photo1.jpg")
 	if err != nil {
 		log.Fatal(err)
 	}
-	p1 = helper.SubsamplingPixels(img1)
+	p1 = helper.SubsamplingPixelsFromImage(img1)
 
 	if len(p1) != 300*225 {
 		log.Fatal("Unexpected sample size found for photo1: ", len(p1))
@@ -40,7 +39,10 @@ func TestWSM(t *testing.T) {
 		{209, 226, 222},
 		{202, 126, 31},
 	}
-	palette := WSM(p1, 6)
+	palette, err := WSM(p1, 6)
+	if err != nil {
+		t.Error(err)
+	}
 	for i := 0; i < 6; i++ {
 		if !reflect.DeepEqual(palette[i], expected[i]) {
 			t.Errorf("unequaled palette found, expected: %v, got %v", expected[i], palette[i])
@@ -50,6 +52,6 @@ func TestWSM(t *testing.T) {
 
 func BenchmarkWSM(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_ = WSM(p1, 6)
+		_, _ = WSM(p1, 6)
 	}
 }

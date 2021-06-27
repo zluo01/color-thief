@@ -1,6 +1,9 @@
 package argsort
 
-import "sort"
+import (
+	"errors"
+	"sort"
+)
 
 // ArgSortedFloat ----------
 // https://gist.github.com/ericjster/1f44fda536728cbbfddd3df0e2a613d8
@@ -25,17 +28,17 @@ func (a argSortFloat) Swap(i, j int) {
 }
 
 // ArgSortedFloat New allocates and returns an array of indexes into the source float array.
-func ArgSortedFloat(src []float64) []int {
+func ArgSortedFloat(src []float64) ([]int, error) {
 	indices := make([]int, len(src))
 	for i := range src {
 		indices[i] = i
 	}
 	if len(src) != len(indices) {
-		panic("floats: length of indices does not match length of slice")
+		return nil, errors.New("floats: length of indices does not match length of slice")
 	}
 	a := argSortFloat{value: src, indices: indices}
 	sort.Sort(a)
-	return indices
+	return indices, nil
 }
 
 type argSortInt struct {
@@ -56,15 +59,15 @@ func (a argSortInt) Swap(i, j int) {
 }
 
 // ArgSortedInt New allocates and returns an array of indexes into the source float array.
-func ArgSortedInt(src []int) []int {
+func ArgSortedInt(src []int) ([]int, error) {
 	indices := make([]int, len(src))
 	for i := range src {
 		indices[i] = i
 	}
 	if len(src) != len(indices) {
-		panic("floats: length of indices does not match length of slice")
+		return nil, errors.New("floats: length of indices does not match length of slice")
 	}
 	a := argSortInt{value: src, indices: indices}
 	sort.Sort(a)
-	return indices
+	return indices, nil
 }

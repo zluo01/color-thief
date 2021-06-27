@@ -38,7 +38,10 @@ func init() {
 
 func TestArgSort(t *testing.T) {
 	for i := 0; i < len(data); i++ {
-		res := ArgSortedFloat(data[i])
+		res, err := ArgSortedFloat(data[i])
+		if err != nil {
+			t.Error(err)
+		}
 		for j := 0; j < len(data[i]); j++ {
 			if expected[i][j] != res[j] {
 				t.Error("unequaled result", expected[i], res)
@@ -58,7 +61,7 @@ func TestArgSort(t *testing.T) {
 func BenchmarkArgSort(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, v := range data {
-			_ = ArgSortedFloat(v)
+			_, _ = ArgSortedFloat(v)
 		}
 	}
 }
