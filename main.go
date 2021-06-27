@@ -1,35 +1,105 @@
-package main
+package color_thief
 
 import (
+	"color-thief/helper"
+	"color-thief/wsm"
+	"color-thief/wu"
+	"errors"
 	"image"
-	_ "image/jpeg"
-	_ "image/png"
-	"log"
+	"image/color"
+	"image/png"
 	"os"
 )
 
-func main() {
-	res, err := os.Open("example/photo1.jpg")
+// GetColorFromFile return the base color from the image file
+func GetColorFromFile(imgPath string) (color.Color, error) {
+	colors, err := GetPaletteFromFile(imgPath, 10, 0)
 	if err != nil {
-		log.Fatal(err)
+		return color.RGBA{}, nil
 	}
-	defer func(res *os.File) {
-		err := res.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(res)
-	img, _, err := image.Decode(res)
+	return colors[0], nil
+}
+
+// GetColor return the base color from the image
+func GetColor(img image.Image, numColors, functionType int) (color.Color, error) {
+	colors, err := GetPalette(img, numColors, functionType)
 	if err != nil {
-		log.Fatal(err)
+		return color.RGBA{}, nil
+	}
+	return colors[0], nil
+}
+
+// GetPaletteFromFile return cluster similar colors from the image file
+func GetPaletteFromFile(imgPath string, numColors, functionType int) ([]color.Color, error) {
+	var img image.Image
+	var err error
+
+	// load image
+	img, err = helper.ReadImage(imgPath)
+	if err != nil {
+		return nil, err
 	}
 
-	// [{70d8ef 0} {2a1c14 0.8070654904252931} {453a32 0.6789211446939512} {8c8579 0.4494588794287456} {51b5c6 0.12899715626661845} {7ae5f3 0.06724747276084027}]
-	expected := []string{"70d8ef", "2a1c14", "453a32", "8c8579", "51b5c6", "7ae5f3"}
-	p := GetPalette(img, 6)
-	for i, c := range p {
-		if c.Color != expected[i] {
-			log.Fatal("Unequal color found", c.Color, expected[i])
+	return GetPalette(img, numColors, functionType)
+}
+
+// GetPalette return cluster similar colors by the median cut algorithm
+func GetPalette(img image.Image, numColors, functionType int) ([]color.Color, error) {
+	var palette, pixels [][3]int
+	var colors []color.Color
+	var err error
+
+	if numColors < 1 {
+		return nil, errors.New("number of colors should be greater than 0")
+	}
+
+	pixels = helper.SubsamplingPixelsFromImage(img)
+	switch functionType {
+	case 0:
+		palette, err = wu.QuantWu(pixels, numColors)
+		break
+	case 1:
+		palette, err = wsm.WSM(pixels, numColors)
+		break
+	default:
+		return nil, errors.New("function type should be either 0 or 1")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	colors = make([]color.Color, len(palette))
+	for i, v := range palette {
+		colors[i] = helper.Color(v)
+	}
+	return colors, nil
+}
+
+func PrintColor(colors []color.Color, filename string) error {
+	imgWidth := 100 * len(colors)
+	imgHeight := 200
+	if imgWidth == 0 {
+		return errors.New("colors empty")
+	}
+
+	palettes := image.NewPaletted(image.Rect(0, 0, imgWidth, imgHeight), colors)
+
+	for x := 0; x < imgWidth; x++ {
+		idx := x / 100
+		for y := 0; y < imgHeight; y++ {
+			palettes.SetColorIndex(x, y, uint8(idx))
 		}
 	}
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+
+	if err = png.Encode(file, palettes); err != nil {
+		return err
+	}
+
+	return file.Close()
 }

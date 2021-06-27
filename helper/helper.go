@@ -3,6 +3,7 @@ package helper
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
@@ -11,7 +12,7 @@ import (
 
 // SubsamplingPixels 2.2.1 Implement 2:1 subsampling in the horizontal and vertical directions, so that only
 // 1/4-th of the input image pixels are taken into account
-func SubsamplingPixels(src []int, width, height int) [][3]int {
+func SubsamplingPixels(src []uint8, width, height int) [][3]int {
 	var offset, y, x, idx int
 	var samplingSize int
 	var pixels [][3]int
@@ -23,7 +24,7 @@ func SubsamplingPixels(src []int, width, height int) [][3]int {
 	for y = 0; y < height; y += 2 {
 		for x = 0; x < width; x += 2 {
 			offset = (y*width + x) * 4
-			pixels[idx][0], pixels[idx][1], pixels[idx][2] = src[offset], src[offset+1], src[offset+2]
+			pixels[idx][0], pixels[idx][1], pixels[idx][2] = int(src[offset]), int(src[offset+1]), int(src[offset+2])
 			idx++
 		}
 	}
@@ -58,6 +59,15 @@ func SubsamplingPixelsFromImage(src image.Image) [][3]int {
 
 func Hex(c [3]int) string {
 	return fmt.Sprintf("#%02x%02x%02x", uint8(c[0]), uint8(c[1]), uint8(c[2]))
+}
+
+func Color(c [3]int) color.Color {
+	return color.RGBA{
+		R: uint8(c[0]),
+		G: uint8(c[1]),
+		B: uint8(c[2]),
+		A: 255,
+	}
 }
 
 func ReadImage(uri string) (image.Image, error) {
