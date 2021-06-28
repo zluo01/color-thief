@@ -15,6 +15,7 @@ const (
 	red      = 2
 	green    = 1
 	blue     = 0
+	cubeSize = 33 * 33 * 33
 )
 
 type box struct {
@@ -37,7 +38,7 @@ func getColorIndex(r, g, b int) int {
  */
 
 // hist3d  build 3-D color histogram of counts, r/g/b, c^2
-func hist3d(src [][3]int, size int, vwt, vmr, vmg, vmb []int, m2 []float64) []int {
+func hist3d(src [][3]int, size int, vwt, vmr, vmg, vmb *[cubeSize]int, m2 *[cubeSize]float64) []int {
 	var i int
 	var ind, r, g, b int
 	var inr, ing, inb int // index for r,g,b
@@ -85,7 +86,7 @@ func hist3d(src [][3]int, size int, vwt, vmr, vmg, vmb []int, m2 []float64) []in
 */
 
 // m3d Compute cumulative moments. */
-func m3d(vwt, vmr, vmg, vmb []int, m2 []float64) {
+func m3d(vwt, vmr, vmg, vmb *[cubeSize]int, m2 *[cubeSize]float64) {
 	var i, r, g, b int
 	var ind1, ind2 int
 	var line, lineR, lineG, lineB int
@@ -130,7 +131,7 @@ func m3d(vwt, vmr, vmg, vmb []int, m2 []float64) {
 }
 
 // vol Compute sum over a box of any given statistic
-func vol(cube *box, moment []int) int {
+func vol(cube *box, moment *[cubeSize]int) int {
 	return moment[getColorIndex(cube.r1, cube.g1, cube.b1)] -
 		moment[getColorIndex(cube.r1, cube.g1, cube.b0)] -
 		moment[getColorIndex(cube.r1, cube.g0, cube.b1)] +
@@ -142,7 +143,7 @@ func vol(cube *box, moment []int) int {
 }
 
 // volFloat Computes the volume of the cube in a specific moment. For the floating-point values.
-func volFloat(cube *box, moment []float64) float64 {
+func volFloat(cube *box, moment *[cubeSize]float64) float64 {
 	return moment[getColorIndex(cube.r1, cube.g1, cube.b1)] -
 		moment[getColorIndex(cube.r1, cube.g1, cube.b0)] -
 		moment[getColorIndex(cube.r1, cube.g0, cube.b1)] +
@@ -161,7 +162,7 @@ func volFloat(cube *box, moment []float64) float64 {
 */
 
 // bottom Compute part of Vol(cube, mmt) that doesn't depend on r1, g1, or b1 (depending on dir)
-func bottom(cube *box, direction int, moment []int) int {
+func bottom(cube *box, direction int, moment *[cubeSize]int) int {
 	switch direction {
 	case red:
 		return -moment[getColorIndex(cube.r0, cube.g1, cube.b1)] +
@@ -184,7 +185,7 @@ func bottom(cube *box, direction int, moment []int) int {
 }
 
 // top Compute remainder of Vol(cube, mmt), substituting pos for r1, g1, or b1 (depending on dir)
-func top(cube *box, direction, position int, moment []int) int {
+func top(cube *box, direction, position int, moment *[cubeSize]int) int {
 	switch direction {
 	case red:
 		return moment[getColorIndex(position, cube.g1, cube.b1)] -
@@ -210,7 +211,7 @@ func top(cube *box, direction, position int, moment []int) int {
 // variance
 // Compute the weighted variance of a box
 // NB: as with the raw statistics, this is really the variance * size
-func variance(cube *box, wt, mr, mg, mb []int, m2 []float64) float64 {
+func variance(cube *box, wt, mr, mg, mb *[cubeSize]int, m2 *[cubeSize]float64) float64 {
 	volumeRed := float64(vol(cube, mr))
 	volumeGreen := float64(vol(cube, mg))
 	volumeBlue := float64(vol(cube, mb))
@@ -230,7 +231,7 @@ func variance(cube *box, wt, mr, mg, mb []int, m2 []float64) float64 {
 // so we drop the minus sign and MAXIMIZE the sum of the two terms.
 func maximize(cube *box, dir, first, last int, cut *int,
 	wholeR, wholeG, wholeB, wholeW int,
-	wt, mr, mg, mb []int) float64 {
+	wt, mr, mg, mb *[cubeSize]int) float64 {
 
 	var i int
 	var halfR, halfG, halfB, halfW int
@@ -278,7 +279,7 @@ func maximize(cube *box, dir, first, last int, cut *int,
 	return max
 }
 
-func cut(set1, set2 *box, wt, mr, mg, mb []int) bool {
+func cut(set1, set2 *box, wt, mr, mg, mb *[cubeSize]int) bool {
 	var dir int
 	var cutR, cutG, cutB int
 	var wholeR, wholeG, wholeB, wholeW int
@@ -328,7 +329,7 @@ func cut(set1, set2 *box, wt, mr, mg, mb []int) bool {
 	return true
 }
 
-func mark(cube *box, label int, tag []int) {
+func mark(cube *box, label int, tag *[cubeSize]int) {
 	var r, g, b int
 	for r = cube.r0 + 1; r <= cube.r1; r++ {
 		for g = cube.g0 + 1; g <= cube.g1; g++ {
@@ -342,14 +343,14 @@ func mark(cube *box, label int, tag []int) {
 func QuantWu(pixels [][3]int, k int) ([][3]int, error) {
 	var lutRgb [maxColor][3]int
 	var qadd []int
-	var tag []int
+	var tag [cubeSize]int
 	var next int
 	var i, j int
 	var weight int
 	var size int
 	var maxColors int
-	var wt, mr, mg, mb []int
-	var m2 []float64
+	var wt, mr, mg, mb [cubeSize]int
+	var m2 [cubeSize]float64
 	var temp float64
 	var vv [maxColor]float64
 	var cube [maxColor]box
@@ -358,31 +359,25 @@ func QuantWu(pixels [][3]int, k int) ([][3]int, error) {
 
 	maxColors = k
 
-	wt = make([]int, 33*33*33)
-	mr = make([]int, 33*33*33)
-	mg = make([]int, 33*33*33)
-	mb = make([]int, 33*33*33)
-	m2 = make([]float64, 33*33*33)
-
 	size = len(pixels)
-	qadd = hist3d(pixels, size, wt, mr, mg, mb, m2)
+	qadd = hist3d(pixels, size, &wt, &mr, &mg, &mb, &m2)
 
-	m3d(wt, mr, mg, mb, m2)
+	m3d(&wt, &mr, &mg, &mb, &m2)
 
 	cube[0] = box{r1: 32, g1: 32, b1: 32}
 
 	next = 0
 	for i = 1; i < maxColors; i++ {
-		if cut(&cube[next], &cube[i], wt, mr, mg, mb) {
+		if cut(&cube[next], &cube[i], &wt, &mr, &mg, &mb) {
 			/* Volume test ensures we won't try to cut one-cell box */
 			if cube[next].vol > 1 {
-				vv[next] = variance(&cube[next], wt, mr, mg, mb, m2)
+				vv[next] = variance(&cube[next], &wt, &mr, &mg, &mb, &m2)
 			} else {
 				vv[next] = 0
 			}
 
 			if cube[i].vol > 1 {
-				vv[i] = variance(&cube[i], wt, mr, mg, mb, m2)
+				vv[i] = variance(&cube[i], &wt, &mr, &mg, &mb, &m2)
 			} else {
 				vv[i] = 0
 			}
@@ -406,13 +401,12 @@ func QuantWu(pixels [][3]int, k int) ([][3]int, error) {
 		}
 	}
 
-	tag = make([]int, 33*33*33)
 	for i = 0; i < maxColors; i++ {
-		mark(&cube[i], i, tag)
-		weight = vol(&cube[i], wt)
+		mark(&cube[i], i, &tag)
+		weight = vol(&cube[i], &wt)
 
 		if weight > 0 {
-			lutRgb[i][0], lutRgb[i][1], lutRgb[i][2] = vol(&cube[i], mr)/weight, vol(&cube[i], mg)/weight, vol(&cube[i], mb)/weight
+			lutRgb[i][0], lutRgb[i][1], lutRgb[i][2] = vol(&cube[i], &mr)/weight, vol(&cube[i], &mg)/weight, vol(&cube[i], &mb)/weight
 		} else { /* Bogux box */
 			lutRgb[i][0], lutRgb[i][1], lutRgb[i][2] = 0, 0, 0
 		}

@@ -103,10 +103,7 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 		// compute distance matrix
 		for i = 0; i < k; i++ {
 			for j = i + 1; j < k; j++ {
-				dist = (centroids[i][0]-centroids[j][0])*(centroids[i][0]-centroids[j][0]) +
-					(centroids[i][1]-centroids[j][1])*(centroids[i][1]-centroids[j][1]) +
-					(centroids[i][2]-centroids[j][2])*(centroids[i][2]-centroids[j][2])
-				dist = math.Sqrt(dist)
+				dist = distance(&centroids[i], &centroids[j])
 				d[i*k+j], d[j*k+i] = dist, dist
 			}
 		}
@@ -127,20 +124,14 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 			}
 			p = p2c[i]
 			cPix = pixels[i]
-			dist = (cPix[0]-centroids[p][0])*(cPix[0]-centroids[p][0]) +
-				(cPix[1]-centroids[p][1])*(cPix[1]-centroids[p][1]) +
-				(cPix[2]-centroids[p][2])*(cPix[2]-centroids[p][2])
-			dist = math.Sqrt(dist)
+			dist = distance(&cPix, &centroids[p])
 			minDist, prevDist = dist, dist
 			for j = 1; j < k; j++ {
 				t = m[p*k+j]
 				if d[p*k+t] >= 4*prevDist {
 					break // There can be no other closer center. Stop checking
 				}
-				dist = (cPix[0]-centroids[t][0])*(cPix[0]-centroids[t][0]) +
-					(cPix[1]-centroids[t][1])*(cPix[1]-centroids[t][1]) +
-					(cPix[2]-centroids[t][2])*(cPix[2]-centroids[t][2])
-				dist = math.Sqrt(dist)
+				dist = distance(&cPix, &centroids[t])
 				if dist <= minDist {
 					minDist = dist
 					p2c[i] = t
@@ -166,6 +157,7 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 			cSize[p] += w * size
 		}
 
+		// compute new center value
 		for i = 0; i < k; i++ {
 			nR = cR[i] / cW[i]
 			nG = cG[i] / cW[i]
@@ -174,6 +166,7 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 			centroids[i][0], centroids[i][1], centroids[i][2] = nR, nG, nB
 		}
 
+		// compute loss
 		tempLoss = 0
 		for i, w = range hist {
 			if w == 0 {
@@ -181,10 +174,7 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 			}
 			p = p2c[i]
 			cPix = pixels[i]
-			dist = (cPix[0]-centroids[p][0])*(cPix[0]-centroids[p][0]) +
-				(cPix[1]-centroids[p][1])*(cPix[1]-centroids[p][1]) +
-				(cPix[2]-centroids[p][2])*(cPix[2]-centroids[p][2])
-			dist = math.Sqrt(dist)
+			dist = distance(&cPix, &centroids[p])
 			tempLoss += dist
 		}
 
@@ -203,4 +193,11 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 		palette[i][0], palette[i][1], palette[i][2] = int(cPix[0]), int(cPix[1]), int(cPix[2])
 	}
 	return palette, nil
+}
+
+func distance(p1, p2 *[3]float64) float64 {
+	dist := (p1[0]-p2[0])*(p1[0]-p2[0]) +
+		(p1[1]-p2[1])*(p1[1]-p2[1]) +
+		(p1[2]-p2[2])*(p1[2]-p2[2])
+	return math.Sqrt(dist)
 }

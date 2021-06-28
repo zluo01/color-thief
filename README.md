@@ -3,7 +3,7 @@
 A high performance Golang module for grabbing the color palette from an image. Instead of 
 implement conventional MMQC, it implements Xiaolin Wu's Color Quantizer[[1]](#1) as well as
 Weighted Sort-Means + Wu algorithm[[2]](#2). They both yield 
-much better final color quantization result from the evaluations.[[2]](#2).
+much better color quantization result from the evaluations.[[2]](#2).
 
 ### performance:
 #### Wu's Color Quantizer
@@ -13,7 +13,7 @@ goarch: amd64
 pkg: color-thief/wu
 cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
 BenchmarkQuantWu
-BenchmarkQuantWu-12    	     842	   1383856 ns/op
+BenchmarkQuantWu-12    	    1315	    914729 ns/op
 PASS
 ```
 
@@ -24,7 +24,7 @@ goarch: amd64
 pkg: color-thief/wsm
 cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
 BenchmarkWSM
-BenchmarkWSM-12    	     204	   5360543 ns/op
+BenchmarkWSM-12    	     244	   4648723 ns/op
 PASS
 ```
 ## Reference
