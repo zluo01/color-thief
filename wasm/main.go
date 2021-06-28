@@ -4,38 +4,34 @@ import (
 	"color-thief/helper"
 	"color-thief/wsm"
 	"color-thief/wu"
-	"log"
+	"fmt"
 	"strings"
-	"syscall/js"
 )
 
-func main() {
-	c := make(chan struct{}, 0)
+func main() {}
 
-	println("Go WebAssembly Initialized")
+var buffer []uint8
 
-	js.Global().Set("getPalette", js.FuncOf(getPalette))
-
-	<-c
+// Function to return a pointer (Index) to our buffer in wasm memory
+//export initBuffer
+func initBuffer(size int) {
+	buffer = make([]uint8, size)
 }
 
-func getPalette(_ js.Value, args []js.Value) interface{} {
+// Function to return a pointer (Index) to our buffer in wasm memory
+//export getWasmMemoryBufferPointer
+func getWasmMemoryBufferPointer() *uint8 {
+	return &buffer[0]
+}
+
+// Function to return palettes compute from our buffer in wasm memory
+//export getPalette
+func getPalette(width, height, k, s int) string {
 	var pixels, palette [][3]int
-	var img []int
-	var width, height int
-	var k, s int
 	var err error
 	var sb strings.Builder
 
-	width, height, k, s = args[1].Int(), args[2].Int(), args[3].Int(), args[4].Int()
-
-	img = parsePixelArray(args[0], width, height)
-
-	if len(img) != width*height*4 {
-		log.Fatal("invalid image size", len(img))
-	}
-
-	pixels = helper.SubsamplingPixels(img, width, height)
+	pixels = helper.SubsamplingPixels(buffer, width, height)
 
 	switch s {
 	case 0:
@@ -45,11 +41,13 @@ func getPalette(_ js.Value, args []js.Value) interface{} {
 		palette, err = wsm.WSM(pixels, k)
 		break
 	default:
-		log.Fatal("function type should be either 0 or 1")
+		fmt.Println("function type should be either 0 or 1") // Todo fix later
+		return ""
 	}
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err) // Todo fix later
+		return ""
 	}
 
 	sb = strings.Builder{}
@@ -60,13 +58,4 @@ func getPalette(_ js.Value, args []js.Value) interface{} {
 		}
 	}
 	return sb.String()
-}
-
-func parsePixelArray(arr js.Value, width, height int) []int {
-	size := width * height * 4
-	pixels := make([]int, size)
-	for i := 0; i < size; i++ {
-		pixels[i] = arr.Index(i).Int()
-	}
-	return pixels
 }
