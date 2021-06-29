@@ -14,34 +14,28 @@ const (
 
 // encode image pixels to 1d histogram with weight proportion to its frequency
 // normalize by the total number of pixels
-func getHistogram(pixels [][3]int) ([HistSize]float64, [HistSize][3]float64) {
+func getHistogram(src [][3]int, size float64, pixels *[HistSize][3]float64, hist *[HistSize]float64) {
 	var ind, r, g, b, i int
 	var inr, ing, inb int
-	var size float64
 
-	pix := [HistSize][3]float64{}
-	hist := [HistSize]float64{}
-
-	for i = range pixels {
-		r = pixels[i][0]
-		g = pixels[i][1]
-		b = pixels[i][2]
+	for i = range src {
+		r = src[i][0]
+		g = src[i][1]
+		b = src[i][2]
 
 		inr = r >> Shift
 		ing = g >> Shift
 		inb = b >> Shift
 
 		ind = (inr << (2 * HistBits)) + (ing << HistBits) + inb
-		pix[ind][0], pix[ind][1], pix[ind][2] = float64(r), float64(g), float64(b)
+		pixels[ind][0], pixels[ind][1], pixels[ind][2] = float64(r), float64(g), float64(b)
 		hist[ind]++
 	}
 
 	// normalize weight by the number of pixels in the image
-	size = float64(len(pixels))
 	for i = 0; i < HistSize; i++ {
 		hist[i] /= size
 	}
-	return hist, pix
 }
 
 func WSM(src [][3]int, k int) [][3]int {
@@ -65,7 +59,8 @@ func WSM(src [][3]int, k int) [][3]int {
 	var p, t int
 
 	// get histogram
-	hist, pixels = getHistogram(src)
+	size = float64(len(src))
+	getHistogram(src, size, &pixels, &hist)
 
 	// init cluster centers based on wu color quantization result
 	palette = wu.QuantWu(src, k)
@@ -90,7 +85,6 @@ func WSM(src [][3]int, k int) [][3]int {
 	}
 
 	loss = 1e6
-	size = float64(len(src))
 	d = make([]float64, k*k)
 	m = make([]int, k*k)
 	cR = make([]float64, k)

@@ -24,12 +24,6 @@ func init() {
 	}
 }
 
-func BenchmarkGetHistogram(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_, _ = getHistogram(p1)
-	}
-}
-
 func TestWSM(t *testing.T) {
 	expected := [][3]int{
 		{109, 210, 229},
