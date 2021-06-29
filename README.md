@@ -1,9 +1,9 @@
 # color-thief
 
-A high performance Golang module for grabbing the color palette from an image. Instead of 
-implement conventional Modified Median Color Quantization (MMCQ), it implements Xiaolin Wu's Color Quantizer[[1]](#1) as well as
+A high performance Golang module for grabbing color palettes from images. Instead of 
+implementing conventional Modified Median Color Quantization (MMCQ), it implements Xiaolin Wu's Color Quantizer[[1]](#1) as well as
 Weighted Sort-Means + Wu algorithm[[2]](#2). They both yield 
-much better color quantization result from the evaluations.[[2]](#2).
+much better color quantization result from the evaluation.[[2]](#2).
 
 ### performance:
 #### Wu's Color Quantizer
