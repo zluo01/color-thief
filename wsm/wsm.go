@@ -12,6 +12,8 @@ const (
 	HistSize = 1 << (3 * HistBits)
 )
 
+// encode image pixels to 1d histogram with weight proportion to its frequency
+// normalize by the total number of pixels
 func getHistogram(pixels [][3]int) ([HistSize]float64, [HistSize][3]float64) {
 	var ind, r, g, b, i int
 	var inr, ing, inb int
@@ -55,6 +57,7 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 	var palette [][3]int                // palette container
 	var cPix [3]float64                 // pixel with float
 	var pix [3]int                      // pixel with int
+	var rank []int                      // palette usage count
 	var dist, minDist, prevDist float64
 	var loss, tempLoss float64
 	var size, w float64
@@ -111,11 +114,8 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 		// Construct a K × K matrix M in which row i is a permutation of 1, 2, . . . , K that
 		// represents the clusters in increasing order of distance of their centers from c_i
 		for i = 0; i < k; i++ {
-			r, err := argsort.ArgSortedFloat(d[i*k : i*k+k])
-			if err != nil {
-				return nil, err
-			}
-			copy(m[i*k:i*k+k], r)
+			rank = argsort.Quicksort(d[i*k : i*k+k])
+			copy(m[i*k:i*k+k], rank)
 		}
 
 		for i, w = range hist {
@@ -184,12 +184,9 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 		loss = tempLoss
 	}
 
-	clusterRank, err := argsort.ArgSortedFloat(cSize)
-	if err != nil {
-		return nil, err
-	}
+	rank = argsort.Quicksort(cSize)
 	for i = 0; i < k; i++ {
-		cPix = centroids[clusterRank[k-1-i]]
+		cPix = centroids[rank[k-1-i]]
 		palette[i][0], palette[i][1], palette[i][2] = int(cPix[0]), int(cPix[1]), int(cPix[2])
 	}
 	return palette, nil

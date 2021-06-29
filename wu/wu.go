@@ -354,7 +354,8 @@ func QuantWu(pixels [][3]int, k int) ([][3]int, error) {
 	var temp float64
 	var vv [maxColor]float64
 	var cube [maxColor]box
-	var count []int
+	var count []float64
+	var rank []int
 	var palettes [][3]int
 
 	maxColors = k
@@ -412,18 +413,15 @@ func QuantWu(pixels [][3]int, k int) ([][3]int, error) {
 		}
 	}
 
-	count = make([]int, maxColors)
+	count = make([]float64, maxColors)
 	for i = 0; i < size; i++ {
 		count[tag[qadd[i]]]++
 	}
 
-	count, err := argsort.ArgSortedInt(count)
-	if err != nil {
-		return nil, err
-	}
+	rank = argsort.Quicksort(count)
 	palettes = make([][3]int, k)
 	for i = 0; i < maxColors; i++ {
-		palettes[i] = lutRgb[count[maxColors-1-i]]
+		palettes[i] = lutRgb[rank[maxColors-1-i]]
 	}
 	return palettes, nil
 }
