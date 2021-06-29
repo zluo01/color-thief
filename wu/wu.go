@@ -340,7 +340,7 @@ func mark(cube *box, label int, tag *[cubeSize]int) {
 	}
 }
 
-func QuantWu(pixels [][3]int, k int) ([][3]int, error) {
+func QuantWu(pixels [][3]int, k int) [][3]int {
 	var lutRgb [maxColor][3]int
 	var qadd []int
 	var tag [cubeSize]int
@@ -423,5 +423,5 @@ func QuantWu(pixels [][3]int, k int) ([][3]int, error) {
 	for i = 0; i < maxColors; i++ {
 		palettes[i] = lutRgb[rank[maxColors-1-i]]
 	}
-	return palettes, nil
+	return palettes
 }

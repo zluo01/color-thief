@@ -28,25 +28,19 @@ func getWasmMemoryBufferPointer() *uint8 {
 //export getPalette
 func getPalette(width, height, k, s int) string {
 	var pixels, palette [][3]int
-	var err error
 	var sb strings.Builder
 
 	pixels = helper.SubsamplingPixels(buffer, width, height)
 
 	switch s {
 	case 0:
-		palette, err = wu.QuantWu(pixels, k)
+		palette = wu.QuantWu(pixels, k)
 		break
 	case 1:
-		palette, err = wsm.WSM(pixels, k)
+		palette = wsm.WSM(pixels, k)
 		break
 	default:
 		fmt.Println("function type should be either 0 or 1") // Todo fix later
-		return ""
-	}
-
-	if err != nil {
-		fmt.Println(err) // Todo fix later
 		return ""
 	}
 

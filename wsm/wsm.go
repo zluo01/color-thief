@@ -44,7 +44,7 @@ func getHistogram(pixels [][3]int) ([HistSize]float64, [HistSize][3]float64) {
 	return hist, pix
 }
 
-func WSM(src [][3]int, k int) ([][3]int, error) {
+func WSM(src [][3]int, k int) [][3]int {
 	// variables
 	var centroids [][3]float64          // centroid list with size of k
 	var d []float64                     // distance matrix
@@ -63,19 +63,16 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 	var size, w float64
 	var iter, i, j int
 	var p, t int
-	var err error
 
 	// get histogram
 	hist, pixels = getHistogram(src)
 
 	// init cluster centers based on wu color quantization result
-	palette, err = wu.QuantWu(src, k)
-	if err != nil {
-		return nil, err
-	}
+	palette = wu.QuantWu(src, k)
+
 	// cannot produce enough color, create palette using color scheme
 	if len(palette) < k {
-		return palette, nil
+		return palette
 	}
 
 	// init centroids
@@ -189,7 +186,7 @@ func WSM(src [][3]int, k int) ([][3]int, error) {
 		cPix = centroids[rank[k-1-i]]
 		palette[i][0], palette[i][1], palette[i][2] = int(cPix[0]), int(cPix[1]), int(cPix[2])
 	}
-	return palette, nil
+	return palette
 }
 
 func distance(p1, p2 *[3]float64) float64 {
