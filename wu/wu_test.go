@@ -26,10 +26,7 @@ func TestQuantWu(t *testing.T) {
 		{206, 222, 223},
 		{214, 120, 24},
 	}
-	palette, err := QuantWu(p, 6)
-	if err != nil {
-		t.Error(err)
-	}
+	palette := QuantWu(p, 6)
 	for i := 0; i < 6; i++ {
 		if !reflect.DeepEqual(palette[i], expected[i]) {
 			t.Errorf("unequaled palette found, expected: %v, got %v", expected[i], palette[i])
@@ -39,6 +36,6 @@ func TestQuantWu(t *testing.T) {
 
 func BenchmarkQuantWu(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_, _ = QuantWu(p, 6)
+		_ = QuantWu(p, 6)
 	}
 }

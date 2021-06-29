@@ -39,10 +39,7 @@ func TestWSM(t *testing.T) {
 		{209, 226, 222},
 		{202, 126, 31},
 	}
-	palette, err := WSM(p1, 6)
-	if err != nil {
-		t.Error(err)
-	}
+	palette := WSM(p1, 6)
 	for i := 0; i < 6; i++ {
 		if !reflect.DeepEqual(palette[i], expected[i]) {
 			t.Errorf("unequaled palette found, expected: %v, got %v", expected[i], palette[i])
@@ -52,6 +49,6 @@ func TestWSM(t *testing.T) {
 
 func BenchmarkWSM(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_, _ = WSM(p1, 6)
+		_ = WSM(p1, 6)
 	}
 }

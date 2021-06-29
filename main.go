@@ -47,7 +47,6 @@ func GetPaletteFromFile(imgPath string, numColors, functionType int) ([]color.Co
 func GetPalette(img image.Image, numColors, functionType int) ([]color.Color, error) {
 	var palette, pixels [][3]int
 	var colors []color.Color
-	var err error
 
 	if numColors < 1 {
 		return nil, errors.New("number of colors should be greater than 0")
@@ -56,17 +55,13 @@ func GetPalette(img image.Image, numColors, functionType int) ([]color.Color, er
 	pixels = helper.SubsamplingPixelsFromImage(img)
 	switch functionType {
 	case 0:
-		palette, err = wu.QuantWu(pixels, numColors)
+		palette = wu.QuantWu(pixels, numColors)
 		break
 	case 1:
-		palette, err = wsm.WSM(pixels, numColors)
+		palette = wsm.WSM(pixels, numColors)
 		break
 	default:
 		return nil, errors.New("function type should be either 0 or 1")
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	colors = make([]color.Color, len(palette))
