@@ -15,7 +15,7 @@ import (
 func GetColorFromFile(imgPath string) (color.Color, error) {
 	colors, err := GetPaletteFromFile(imgPath, 10, 0)
 	if err != nil {
-		return color.RGBA{}, nil
+		return color.RGBA{}, err
 	}
 	return colors[0], nil
 }
@@ -24,7 +24,7 @@ func GetColorFromFile(imgPath string) (color.Color, error) {
 func GetColor(img image.Image, numColors, functionType int) (color.Color, error) {
 	colors, err := GetPalette(img, numColors, functionType)
 	if err != nil {
-		return color.RGBA{}, nil
+		return color.RGBA{}, err
 	}
 	return colors[0], nil
 }
